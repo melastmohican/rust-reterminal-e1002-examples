@@ -186,6 +186,43 @@ cargo run --example sd
 
 ---
 
+### Display & E-Paper Examples
+
+#### epd_ed2208_bmp
+
+Displays 24-bit or 32-bit uncompressed BMP images from a microSD card on the 7.3" Good Display GDEP073E01 6-Color ACeP panel using the local `epdsi` driver library (`Ed2208Controller`).
+
+- **Shared SPI Bus:** Shares SPI2 (`SCK: GPIO7`, `MISO: GPIO8`, `MOSI: GPIO9`) between microSD (`CS: GPIO14`) and EPD (`CS: GPIO10`, `DC: GPIO11`, `RES: GPIO12`, `BUSY: GPIO13`) via `embedded_hal_bus::spi::RefCellDevice`.
+- **Nearest Color Quantization:** Quantizes image RGB pixels to the 6 native panel colors (Black, White, Yellow, Red, Blue, Green) using nearest Euclidean distance.
+- **Fallback Test Pattern:** Generates a 6-color stripe test pattern if no SD card or matching BMP image is found.
+
+```bash
+cargo run --release --example epd_ed2208_bmp
+```
+
+![reTerminal E1002 ED2208 BMP Example](images/epd_ed2208_bmp.jpg)
+
+
+#### Image Conversion Tool (`convert_image.py`)
+
+A Python helper script is provided in the repository root to convert any input photo or image (JPG, PNG, WEBP, etc.) into an uncompressed 800x480 BMP formatted for the reTerminal E1002 microSD card:
+
+```bash
+# Basic conversion: resizes to 800x480 and quantizes to 6 e-ink colors
+python3 convert_image.py images/mocha800x480.jpg /Volumes/SD/IMAGE.BMP
+
+# Show on-screen preview of quantized e-ink colors
+python3 convert_image.py images/mocha800x480.jpg --preview
+```
+
+Included sample images in `./images/`:
+- `epd_ed2208_bmp.jpg`: Photo demonstration of the reTerminal E1002 displaying a 6-color BMP image on the 7.3" EPD panel.
+- `image.bmp` / `image_preview.png`: Pre-converted 800x480 6-color sample BMP image.
+- `mocha800x480.jpg` / `mocha800x480_preview.png`: Sample source photo and 6-color e-ink preview.
+
+
+---
+
 ## License
 
 Dual-licensed under either of:

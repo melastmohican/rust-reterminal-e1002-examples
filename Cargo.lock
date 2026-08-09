@@ -27,6 +27,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
+name = "az"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b7e4c2464d97fe331d41de9d5db0def0a96f4d823b8b32a2efd503578988973"
+
+[[package]]
 name = "bitfield"
 version = "0.19.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -473,6 +479,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "embedded-graphics-core"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "95743bef3ff70fcba3930246c4e6872882bbea0dcc6da2ca860112e0cd4bd09f"
+dependencies = [
+ "az",
+ "byteorder",
+]
+
+[[package]]
 name = "embedded-hal"
 version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -593,6 +609,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "epdsi"
+version = "0.1.0"
+source = "git+https://github.com/melastmohican/epdsi#a56bfa523b9a35e4e207881a23743b69b0d1965f"
+dependencies = [
+ "defmt 0.3.100",
+ "embedded-graphics-core",
+ "embedded-hal 1.0.0",
 ]
 
 [[package]]
@@ -1393,6 +1419,7 @@ dependencies = [
  "embassy-time",
  "embedded-hal-bus",
  "embedded-sdmmc",
+ "epdsi",
  "esp-bootloader-esp-idf",
  "esp-hal",
  "esp-println",
