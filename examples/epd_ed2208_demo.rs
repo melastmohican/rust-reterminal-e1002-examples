@@ -41,31 +41,32 @@
 use defmt::{error, info};
 use embassy_time::{Duration, Timer};
 use embedded_graphics::{
+    Drawable, Pixel,
     geometry::{Point, Size},
     mono_font::{
-        ascii::{FONT_10X20, FONT_6X10, FONT_9X15, FONT_9X15_BOLD},
         MonoFont, MonoTextStyle,
+        ascii::{FONT_6X10, FONT_9X15, FONT_9X15_BOLD, FONT_10X20},
     },
     pixelcolor::PixelColor,
+    prelude::*,
     primitives::{
         Circle, Line, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle, RoundedRectangle, Triangle,
     },
     text::{Baseline, Text},
-    Drawable, Pixel, prelude::*,
 };
 use embedded_hal_bus::spi::RefCellDevice;
 use esp_hal::clock::CpuClock;
 use esp_hal::delay::Delay;
 use esp_hal::gpio::{Input, InputConfig, Level, Output, OutputConfig, Pull};
-use esp_hal::spi::master::{Config as SpiConfig, Spi};
 use esp_hal::spi::Mode as SpiMode;
+use esp_hal::spi::master::{Config as SpiConfig, Spi};
 use esp_println as _;
 
+use epdsi::SpiBusWrapper;
 use epdsi::controllers::Ed2208Controller;
 use epdsi::driver::EpdBuilder;
 use epdsi::panels::GDEP073E01;
 use epdsi::traits::{ColorChannel, EpdPanel, SevenColor};
-use epdsi::SpiBusWrapper;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -132,6 +133,7 @@ impl<'a> EpdBuffer<'a> {
         self.buf.fill(packed);
     }
 
+    #[allow(clippy::manual_is_multiple_of)]
     pub fn set_pixel(&mut self, x: u32, y: u32, color: Color6) {
         if x >= self.width || y >= self.height {
             return;
@@ -176,17 +178,12 @@ impl<'a> DrawTarget for EpdBuffer<'a> {
 // Graphic Helper Functions
 // =====================================================================
 
-fn draw_centered_text(
-    target: &mut EpdBuffer,
-    text: &str,
-    y: i32,
-    font: &MonoFont,
-    color: Color6,
-) {
+fn draw_centered_text(target: &mut EpdBuffer, text: &str, y: i32, font: &MonoFont, color: Color6) {
     let character_style = MonoTextStyle::new(font, color);
     let text_width = text.len() as i32 * font.character_size.width as i32;
     let x = (target.width as i32 - text_width) / 2;
-    let _ = Text::with_baseline(text, Point::new(x, y), character_style, Baseline::Top).draw(target);
+    let _ =
+        Text::with_baseline(text, Point::new(x, y), character_style, Baseline::Top).draw(target);
 }
 
 fn draw_header(target: &mut EpdBuffer, title: &str, bg_color: Color6) {
@@ -222,14 +219,23 @@ fn show_screen_1_splash(target: &mut EpdBuffer) {
     }
 
     // Outer border frame
-    let border = Rectangle::new(Point::new(10, 30), Size::new(WIDTH as u32 - 20, HEIGHT as u32 - 40));
+    let border = Rectangle::new(
+        Point::new(10, 30),
+        Size::new(WIDTH as u32 - 20, HEIGHT as u32 - 40),
+    );
     let _ = border
         .into_styled(PrimitiveStyle::with_stroke(Color6::Black, 1))
         .draw(target);
 
     // Centered titles
     draw_centered_text(target, "reTerminal E1002", 120, &FONT_10X20, Color6::Black);
-    draw_centered_text(target, "7.3\" 6-Color e-Paper", 175, &FONT_9X15_BOLD, Color6::Red);
+    draw_centered_text(
+        target,
+        "7.3\" 6-Color e-Paper",
+        175,
+        &FONT_9X15_BOLD,
+        Color6::Red,
+    );
 
     // Blue horizontal divider line
     let line = Line::new(Point::new(200, 220), Point::new(600, 220));
@@ -237,8 +243,20 @@ fn show_screen_1_splash(target: &mut EpdBuffer) {
         .into_styled(PrimitiveStyle::with_stroke(Color6::Blue, 2))
         .draw(target);
 
-    draw_centered_text(target, "epdsi + GDEP073E01 Demo", 250, &FONT_9X15_BOLD, Color6::Green);
-    draw_centered_text(target, "800 x 480 | 6 Colors", 290, &FONT_9X15, Color6::Blue);
+    draw_centered_text(
+        target,
+        "epdsi + GDEP073E01 Demo",
+        250,
+        &FONT_9X15_BOLD,
+        Color6::Green,
+    );
+    draw_centered_text(
+        target,
+        "800 x 480 | 6 Colors",
+        290,
+        &FONT_9X15,
+        Color6::Blue,
+    );
 
     // Colorful bottom stripe (reversed order)
     let bottom_colors = [
@@ -257,7 +275,13 @@ fn show_screen_1_splash(target: &mut EpdBuffer) {
         let _ = rect.into_styled(PrimitiveStyle::with_fill(c)).draw(target);
     }
 
-    draw_centered_text(target, "Seeed Studio x epdsi", HEIGHT as i32 - 42, &FONT_9X15, Color6::Black);
+    draw_centered_text(
+        target,
+        "Seeed Studio x epdsi",
+        HEIGHT as i32 - 42,
+        &FONT_9X15,
+        Color6::Black,
+    );
 }
 
 // =====================================================================
@@ -300,16 +324,40 @@ fn show_screen_2_palette(target: &mut EpdBuffer) {
         let text_style = MonoTextStyle::new(&FONT_9X15_BOLD, Color6::Black);
         let text_w = name.len() as i32 * 9;
         let text_x = x + (sw as i32 - text_w) / 2;
-        let _ = Text::with_baseline(name, Point::new(text_x, sy + sh as i32 + 10), text_style, Baseline::Top).draw(target);
+        let _ = Text::with_baseline(
+            name,
+            Point::new(text_x, sy + sh as i32 + 10),
+            text_style,
+            Baseline::Top,
+        )
+        .draw(target);
     }
 
     // Color combinations row
     let row2_y = sy + sh as i32 + 45;
     let text_style = MonoTextStyle::new(&FONT_9X15, Color6::Black);
-    let _ = Text::with_baseline("Color combinations:", Point::new(sx, row2_y), text_style, Baseline::Top).draw(target);
+    let _ = Text::with_baseline(
+        "Color combinations:",
+        Point::new(sx, row2_y),
+        text_style,
+        Baseline::Top,
+    )
+    .draw(target);
 
-    let bg_colors = [Color6::Red, Color6::Green, Color6::Blue, Color6::Yellow, Color6::Black];
-    let fg_colors = [Color6::Yellow, Color6::Red, Color6::Yellow, Color6::Blue, Color6::Red];
+    let bg_colors = [
+        Color6::Red,
+        Color6::Green,
+        Color6::Blue,
+        Color6::Yellow,
+        Color6::Black,
+    ];
+    let fg_colors = [
+        Color6::Yellow,
+        Color6::Red,
+        Color6::Yellow,
+        Color6::Blue,
+        Color6::Red,
+    ];
     let card_cx = sx + 40;
 
     for i in 0..5 {
@@ -330,9 +378,21 @@ fn show_screen_2_palette(target: &mut EpdBuffer) {
 
     // Horizontal color bars
     let bar_y = row2_y + 120;
-    let _ = Text::with_baseline("Full-width color bars:", Point::new(sx, bar_y), text_style, Baseline::Top).draw(target);
+    let _ = Text::with_baseline(
+        "Full-width color bars:",
+        Point::new(sx, bar_y),
+        text_style,
+        Baseline::Top,
+    )
+    .draw(target);
 
-    let bar_colors = [Color6::Red, Color6::Yellow, Color6::Green, Color6::Blue, Color6::Black];
+    let bar_colors = [
+        Color6::Red,
+        Color6::Yellow,
+        Color6::Green,
+        Color6::Blue,
+        Color6::Black,
+    ];
     let bar_w = (WIDTH as i32 - 2 * sx) as u32;
 
     for (i, &c) in bar_colors.iter().enumerate() {
@@ -343,7 +403,13 @@ fn show_screen_2_palette(target: &mut EpdBuffer) {
         let _ = bar.into_styled(PrimitiveStyle::with_fill(c)).draw(target);
     }
 
-    draw_centered_text(target, "All 6 native colors on the GDEP073E01 panel", HEIGHT as i32 - 20, &FONT_9X15, Color6::Black);
+    draw_centered_text(
+        target,
+        "All 6 native colors on the GDEP073E01 panel",
+        HEIGHT as i32 - 20,
+        &FONT_9X15,
+        Color6::Black,
+    );
 }
 
 // =====================================================================
@@ -370,15 +436,29 @@ fn show_screen_3_typography(target: &mut EpdBuffer) {
 
     y += 45;
     let yellow_style = MonoTextStyle::new(&FONT_9X15_BOLD, Color6::Yellow);
-    let _ = Text::with_baseline("Yellow text - warm and bright", Point::new(x, y), yellow_style, Baseline::Top).draw(target);
+    let _ = Text::with_baseline(
+        "Yellow text - warm and bright",
+        Point::new(x, y),
+        yellow_style,
+        Baseline::Top,
+    )
+    .draw(target);
 
     y += 35;
     let red_style = MonoTextStyle::new(&FONT_9X15_BOLD, Color6::Red);
-    let _ = Text::with_baseline("Red - emphasis and warnings", Point::new(x, y), red_style, Baseline::Top).draw(target);
+    let _ = Text::with_baseline(
+        "Red - emphasis and warnings",
+        Point::new(x, y),
+        red_style,
+        Baseline::Top,
+    )
+    .draw(target);
 
     y += 35;
     let line = Line::new(Point::new(x, y), Point::new(WIDTH as i32 - x, y));
-    let _ = line.into_styled(PrimitiveStyle::with_stroke(Color6::Red, 2)).draw(target);
+    let _ = line
+        .into_styled(PrimitiveStyle::with_stroke(Color6::Red, 2))
+        .draw(target);
 
     // Left column: White text on colored badges
     y += 20;
@@ -401,7 +481,13 @@ fn show_screen_3_typography(target: &mut EpdBuffer) {
             .draw(target);
 
         let style = MonoTextStyle::new(&FONT_9X15_BOLD, Color6::White);
-        let _ = Text::with_baseline(badge_labels[i], Point::new(x + 12, by + 10), style, Baseline::Top).draw(target);
+        let _ = Text::with_baseline(
+            badge_labels[i],
+            Point::new(x + 12, by + 10),
+            style,
+            Baseline::Top,
+        )
+        .draw(target);
     }
 
     // Right column: Black box with colored text
@@ -423,10 +509,22 @@ fn show_screen_3_typography(target: &mut EpdBuffer) {
     ];
     for (i, (t, c)) in right_colors.iter().enumerate() {
         let style = MonoTextStyle::new(&FONT_9X15_BOLD, *c);
-        let _ = Text::with_baseline(t, Point::new(rbx + 25, y + 15 + i as i32 * 32), style, Baseline::Top).draw(target);
+        let _ = Text::with_baseline(
+            t,
+            Point::new(rbx + 25, y + 15 + i as i32 * 32),
+            style,
+            Baseline::Top,
+        )
+        .draw(target);
     }
 
-    draw_centered_text(target, "6-color text rendering", HEIGHT as i32 - 20, &FONT_9X15, Color6::Black);
+    draw_centered_text(
+        target,
+        "6-color text rendering",
+        HEIGHT as i32 - 20,
+        &FONT_9X15,
+        Color6::Black,
+    );
 }
 
 // =====================================================================
@@ -437,7 +535,13 @@ fn show_screen_4_geometry(target: &mut EpdBuffer) {
     draw_header(target, "Color Geometry", Color6::Green);
 
     // Cascading rectangles (left top)
-    let rc_colors = [Color6::Red, Color6::Yellow, Color6::Green, Color6::Blue, Color6::Black];
+    let rc_colors = [
+        Color6::Red,
+        Color6::Yellow,
+        Color6::Green,
+        Color6::Blue,
+        Color6::Black,
+    ];
     for (i, &c) in rc_colors.iter().enumerate() {
         let rect = Rectangle::new(
             Point::new(40 + i as i32 * 55, 55 + i as i32 * 14),
@@ -447,14 +551,28 @@ fn show_screen_4_geometry(target: &mut EpdBuffer) {
     }
 
     // Colored circles (right top)
-    let cc_colors = [Color6::Blue, Color6::Red, Color6::Green, Color6::Yellow, Color6::Black];
+    let cc_colors = [
+        Color6::Blue,
+        Color6::Red,
+        Color6::Green,
+        Color6::Yellow,
+        Color6::Black,
+    ];
     for (i, &c) in cc_colors.iter().enumerate() {
         let circle = Circle::new(Point::new(500 + i as i32 * 55, 75), 48);
-        let _ = circle.into_styled(PrimitiveStyle::with_fill(c)).draw(target);
+        let _ = circle
+            .into_styled(PrimitiveStyle::with_fill(c))
+            .draw(target);
     }
 
     // Colored triangles (left middle)
-    let tri_colors = [Color6::Red, Color6::Green, Color6::Blue, Color6::Yellow, Color6::Black];
+    let tri_colors = [
+        Color6::Red,
+        Color6::Green,
+        Color6::Blue,
+        Color6::Yellow,
+        Color6::Black,
+    ];
     let ty = 200i32;
     for (i, &c) in tri_colors.iter().enumerate() {
         let tx = 40 + i as i32 * 130;
@@ -469,7 +587,13 @@ fn show_screen_4_geometry(target: &mut EpdBuffer) {
     // Olympic rings (middle center)
     let oly_y = 320i32;
     let ox = 200i32;
-    let oly_colors = [Color6::Blue, Color6::Black, Color6::Red, Color6::Yellow, Color6::Green];
+    let oly_colors = [
+        Color6::Blue,
+        Color6::Black,
+        Color6::Red,
+        Color6::Yellow,
+        Color6::Green,
+    ];
     let oly_offsets = [(0, 0), (70, 0), (140, 0), (35, 35), (105, 35)];
 
     for (i, &(dx, dy)) in oly_offsets.iter().enumerate() {
@@ -507,7 +631,13 @@ fn show_screen_4_geometry(target: &mut EpdBuffer) {
     }
 
     // Concentric circles (bottom left)
-    let conc_colors = [Color6::Red, Color6::Yellow, Color6::Green, Color6::Blue, Color6::Black];
+    let conc_colors = [
+        Color6::Red,
+        Color6::Yellow,
+        Color6::Green,
+        Color6::Blue,
+        Color6::Black,
+    ];
     for (r_idx, &c) in conc_colors.iter().enumerate() {
         let radius = 100 - r_idx as i32 * 20;
         let circle = Circle::new(
@@ -519,7 +649,13 @@ fn show_screen_4_geometry(target: &mut EpdBuffer) {
             .draw(target);
     }
 
-    draw_centered_text(target, "Colorful GFX primitives", HEIGHT as i32 - 20, &FONT_9X15, Color6::Black);
+    draw_centered_text(
+        target,
+        "Colorful GFX primitives",
+        HEIGHT as i32 - 20,
+        &FONT_9X15,
+        Color6::Black,
+    );
 }
 
 // =====================================================================
@@ -529,7 +665,13 @@ fn show_screen_5_patterns(target: &mut EpdBuffer) {
     target.clear(Color6::White);
     draw_header(target, "Color Patterns", Color6::Red);
 
-    let p_colors = [Color6::Red, Color6::Green, Color6::Blue, Color6::Yellow, Color6::Black];
+    let p_colors = [
+        Color6::Red,
+        Color6::Green,
+        Color6::Blue,
+        Color6::Yellow,
+        Color6::Black,
+    ];
     let font_style = MonoTextStyle::new(&FONT_9X15, Color6::Black);
 
     let bw = 150u32;
@@ -539,7 +681,13 @@ fn show_screen_5_patterns(target: &mut EpdBuffer) {
     let by = 70i32;
 
     // Pattern 1: Color Check
-    let _ = Text::with_baseline("Color Check", Point::new(bx1, by - 20), font_style, Baseline::Top).draw(target);
+    let _ = Text::with_baseline(
+        "Color Check",
+        Point::new(bx1, by - 20),
+        font_style,
+        Baseline::Top,
+    )
+    .draw(target);
     for py in 0..10 {
         for px in 0..10 {
             let c = p_colors[(px + py) % 5];
@@ -553,31 +701,43 @@ fn show_screen_5_patterns(target: &mut EpdBuffer) {
 
     // Pattern 2: H-Stripes
     let bx2 = bx1 + bw as i32 + gap;
-    let _ = Text::with_baseline("H-Stripes", Point::new(bx2, by - 20), font_style, Baseline::Top).draw(target);
+    let _ = Text::with_baseline(
+        "H-Stripes",
+        Point::new(bx2, by - 20),
+        font_style,
+        Baseline::Top,
+    )
+    .draw(target);
     for py in 0..10 {
         let c = p_colors[py % 5];
-        let rect = Rectangle::new(
-            Point::new(bx2, by + py as i32 * 15),
-            Size::new(bw, 15),
-        );
+        let rect = Rectangle::new(Point::new(bx2, by + py as i32 * 15), Size::new(bw, 15));
         let _ = rect.into_styled(PrimitiveStyle::with_fill(c)).draw(target);
     }
 
     // Pattern 3: V-Stripes
     let bx3 = bx2 + bw as i32 + gap;
-    let _ = Text::with_baseline("V-Stripes", Point::new(bx3, by - 20), font_style, Baseline::Top).draw(target);
+    let _ = Text::with_baseline(
+        "V-Stripes",
+        Point::new(bx3, by - 20),
+        font_style,
+        Baseline::Top,
+    )
+    .draw(target);
     for px in 0..10 {
         let c = p_colors[px % 5];
-        let rect = Rectangle::new(
-            Point::new(bx3 + px as i32 * 15, by),
-            Size::new(15, bh),
-        );
+        let rect = Rectangle::new(Point::new(bx3 + px as i32 * 15, by), Size::new(15, bh));
         let _ = rect.into_styled(PrimitiveStyle::with_fill(c)).draw(target);
     }
 
     // Pattern 4: Color Dots
     let bx4 = bx3 + bw as i32 + gap;
-    let _ = Text::with_baseline("Color Dots", Point::new(bx4, by - 20), font_style, Baseline::Top).draw(target);
+    let _ = Text::with_baseline(
+        "Color Dots",
+        Point::new(bx4, by - 20),
+        font_style,
+        Baseline::Top,
+    )
+    .draw(target);
     for py in 0..8 {
         for px in 0..8 {
             let c = p_colors[(px + py) % 5];
@@ -585,29 +745,41 @@ fn show_screen_5_patterns(target: &mut EpdBuffer) {
                 Point::new(bx4 + 5 + px as i32 * 18, by + 5 + py as i32 * 18),
                 10,
             );
-            let _ = circle.into_styled(PrimitiveStyle::with_fill(c)).draw(target);
+            let _ = circle
+                .into_styled(PrimitiveStyle::with_fill(c))
+                .draw(target);
         }
     }
 
     // Bottom section: Color bar sequence
     let bar_y = by + bh as i32 + 35;
-    let _ = Text::with_baseline("Color bar sequence:", Point::new(bx1, bar_y - 20), font_style, Baseline::Top).draw(target);
+    let _ = Text::with_baseline(
+        "Color bar sequence:",
+        Point::new(bx1, bar_y - 20),
+        font_style,
+        Baseline::Top,
+    )
+    .draw(target);
 
     let seq_w = (WIDTH as i32 - 2 * bx1) as u32;
     for (i, &c) in p_colors.iter().enumerate() {
-        let bar = Rectangle::new(
-            Point::new(bx1, bar_y + i as i32 * 24),
-            Size::new(seq_w, 20),
-        );
+        let bar = Rectangle::new(Point::new(bx1, bar_y + i as i32 * 24), Size::new(seq_w, 20));
         let _ = bar.into_styled(PrimitiveStyle::with_fill(c)).draw(target);
     }
 
-    draw_centered_text(target, "Patterns with the 6 native colors", HEIGHT as i32 - 20, &FONT_9X15, Color6::Black);
+    draw_centered_text(
+        target,
+        "Patterns with the 6 native colors",
+        HEIGHT as i32 - 20,
+        &FONT_9X15,
+        Color6::Black,
+    );
 }
 
 // =====================================================================
 // Screen 6: Dashboard
 // =====================================================================
+#[allow(clippy::too_many_arguments)]
 fn draw_color_card(
     target: &mut EpdBuffer,
     x: i32,
@@ -641,19 +813,32 @@ fn draw_color_card(
     let title_style = MonoTextStyle::new(&FONT_9X15_BOLD, Color6::White);
     let title_w = title.len() as i32 * 9;
     let title_x = x + (w as i32 - title_w) / 2;
-    let _ = Text::with_baseline(title, Point::new(title_x, y + 7), title_style, Baseline::Top).draw(target);
+    let _ = Text::with_baseline(
+        title,
+        Point::new(title_x, y + 7),
+        title_style,
+        Baseline::Top,
+    )
+    .draw(target);
 
     // Main Value
     let val_style = MonoTextStyle::new(&FONT_10X20, accent);
     let val_w = value.len() as i32 * 10;
     let val_x = x + (w as i32 - val_w) / 2;
-    let _ = Text::with_baseline(value, Point::new(val_x, y + 50), val_style, Baseline::Top).draw(target);
+    let _ = Text::with_baseline(value, Point::new(val_x, y + 50), val_style, Baseline::Top)
+        .draw(target);
 
     // Unit
     let unit_style = MonoTextStyle::new(&FONT_9X15, Color6::Black);
     let unit_w = unit.len() as i32 * 9;
     let unit_x = x + (w as i32 - unit_w) / 2;
-    let _ = Text::with_baseline(unit, Point::new(unit_x, y + h as i32 - 25), unit_style, Baseline::Top).draw(target);
+    let _ = Text::with_baseline(
+        unit,
+        Point::new(unit_x, y + h as i32 - 25),
+        unit_style,
+        Baseline::Top,
+    )
+    .draw(target);
 }
 
 fn show_screen_6_dashboard(target: &mut EpdBuffer) {
@@ -666,10 +851,50 @@ fn show_screen_6_dashboard(target: &mut EpdBuffer) {
     let sx = (WIDTH as i32 - (4 * cw as i32 + 3 * gap)) / 2;
     let row1_y = 55i32;
 
-    draw_color_card(target, sx, row1_y, cw, ch, "Temp", "23.5", "Celsius", Color6::Red);
-    draw_color_card(target, sx + cw as i32 + gap, row1_y, cw, ch, "Humidity", "65", "% RH", Color6::Blue);
-    draw_color_card(target, sx + 2 * (cw as i32 + gap), row1_y, cw, ch, "Heap", "284", "kB free", Color6::Green);
-    draw_color_card(target, sx + 3 * (cw as i32 + gap), row1_y, cw, ch, "Uptime", "120", "seconds", Color6::Black);
+    draw_color_card(
+        target,
+        sx,
+        row1_y,
+        cw,
+        ch,
+        "Temp",
+        "23.5",
+        "Celsius",
+        Color6::Red,
+    );
+    draw_color_card(
+        target,
+        sx + cw as i32 + gap,
+        row1_y,
+        cw,
+        ch,
+        "Humidity",
+        "65",
+        "% RH",
+        Color6::Blue,
+    );
+    draw_color_card(
+        target,
+        sx + 2 * (cw as i32 + gap),
+        row1_y,
+        cw,
+        ch,
+        "Heap",
+        "284",
+        "kB free",
+        Color6::Green,
+    );
+    draw_color_card(
+        target,
+        sx + 3 * (cw as i32 + gap),
+        row1_y,
+        cw,
+        ch,
+        "Uptime",
+        "120",
+        "seconds",
+        Color6::Black,
+    );
 
     // Log area with colored markers
     let log_y = row1_y + ch as i32 + 15;
@@ -691,7 +916,13 @@ fn show_screen_6_dashboard(target: &mut EpdBuffer) {
         .draw(target);
 
     let log_title_style = MonoTextStyle::new(&FONT_9X15_BOLD, Color6::White);
-    let _ = Text::with_baseline("Activity Log", Point::new(sx + 15, log_y + 7), log_title_style, Baseline::Top).draw(target);
+    let _ = Text::with_baseline(
+        "Activity Log",
+        Point::new(sx + 15, log_y + 7),
+        log_title_style,
+        Baseline::Top,
+    )
+    .draw(target);
 
     let logs = [
         ("System boot - ESP32-S3 (Embassy)", Color6::Green),
@@ -708,14 +939,21 @@ fn show_screen_6_dashboard(target: &mut EpdBuffer) {
         let dot = Circle::new(Point::new(sx + 18, ly + 2), 8);
         let _ = dot.into_styled(PrimitiveStyle::with_fill(c)).draw(target);
 
-        let _ = Text::with_baseline(text, Point::new(sx + 35, ly), log_text_style, Baseline::Top).draw(target);
+        let _ = Text::with_baseline(text, Point::new(sx + 35, ly), log_text_style, Baseline::Top)
+            .draw(target);
         ly += 26;
     }
 
     // Multi-color progress bar
     let bar_y = log_y + 195;
     let font_bold = MonoTextStyle::new(&FONT_9X15_BOLD, Color6::Black);
-    let _ = Text::with_baseline("Progress:", Point::new(sx, bar_y + 2), font_bold, Baseline::Top).draw(target);
+    let _ = Text::with_baseline(
+        "Progress:",
+        Point::new(sx, bar_y + 2),
+        font_bold,
+        Baseline::Top,
+    )
+    .draw(target);
 
     let bar_x = sx + 100;
     let bar_w = (WIDTH as i32 - 2 * sx - 160) as u32;
@@ -726,7 +964,13 @@ fn show_screen_6_dashboard(target: &mut EpdBuffer) {
         .into_styled(PrimitiveStyle::with_stroke(Color6::Black, 1))
         .draw(target);
 
-    let bar_colors = [Color6::Red, Color6::Yellow, Color6::Green, Color6::Blue, Color6::Black];
+    let bar_colors = [
+        Color6::Red,
+        Color6::Yellow,
+        Color6::Green,
+        Color6::Blue,
+        Color6::Black,
+    ];
     let seg_w = bar_w / 5;
     for (i, &c) in bar_colors.iter().enumerate() {
         let seg = Rectangle::new(
@@ -737,9 +981,21 @@ fn show_screen_6_dashboard(target: &mut EpdBuffer) {
     }
 
     let pct_style = MonoTextStyle::new(&FONT_9X15_BOLD, Color6::Green);
-    let _ = Text::with_baseline("100%", Point::new(bar_x + bar_w as i32 + 10, bar_y + 2), pct_style, Baseline::Top).draw(target);
+    let _ = Text::with_baseline(
+        "100%",
+        Point::new(bar_x + bar_w as i32 + 10, bar_y + 2),
+        pct_style,
+        Baseline::Top,
+    )
+    .draw(target);
 
-    draw_centered_text(target, "6-color ePaper: vivid and power-efficient", HEIGHT as i32 - 20, &FONT_9X15, Color6::Black);
+    draw_centered_text(
+        target,
+        "6-color ePaper: vivid and power-efficient",
+        HEIGHT as i32 - 20,
+        &FONT_9X15,
+        Color6::Black,
+    );
 }
 
 // =====================================================================
@@ -801,7 +1057,8 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
     } else {
         info!("[EPD] Driver initialized successfully.");
 
-        let screens: [(&str, fn(&mut EpdBuffer)); 6] = [
+        type ScreenDemo = (&'static str, fn(&mut EpdBuffer));
+        let screens: [ScreenDemo; 6] = [
             ("Screen 1: Splash", show_screen_1_splash),
             ("Screen 2: Color Palette", show_screen_2_palette),
             ("Screen 3: Color Typography", show_screen_3_typography),
