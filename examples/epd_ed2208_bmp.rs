@@ -46,15 +46,15 @@ use embedded_sdmmc::{Mode, SdCard, TimeSource, Timestamp, VolumeManager};
 use esp_hal::clock::CpuClock;
 use esp_hal::delay::Delay;
 use esp_hal::gpio::{Input, InputConfig, Level, Output, OutputConfig, Pull};
-use esp_hal::spi::master::{Config as SpiConfig, Spi};
 use esp_hal::spi::Mode as SpiMode;
+use esp_hal::spi::master::{Config as SpiConfig, Spi};
 use esp_println as _;
 
+use epdsi::SpiBusWrapper;
 use epdsi::controllers::Ed2208Controller;
 use epdsi::driver::EpdBuilder;
 use epdsi::panels::GDEP073E01;
 use epdsi::traits::{ColorChannel, EpdPanel, SevenColor};
-use epdsi::SpiBusWrapper;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -156,7 +156,7 @@ fn decode_bmp_file<
     );
 
     let bytes_per_px = (bpp / 8) as usize;
-    let row_bytes = ((img_w as usize * bytes_per_px + 3) & !3) as usize;
+    let row_bytes = (img_w as usize * bytes_per_px + 3) & !3;
 
     let row_buf: &mut [u8; 800 * 4] = unsafe { &mut *core::ptr::addr_of_mut!(ROW_BUF) };
 
@@ -262,8 +262,6 @@ fn load_bmp_from_sd<D: embedded_sdmmc::BlockDevice, T: TimeSource>(
 
     Err("No matching BMP file found on SD card")
 }
-
-
 
 /// Generates a vertical 6-color stripe test pattern
 fn generate_test_pattern(frame_buf: &mut [u8; FRAME_BYTES]) {
@@ -383,7 +381,6 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
 
     let epd_spi_dev = RefCellDevice::new_no_delay(&spi_bus_cell, epd_cs).unwrap();
     let bus = SpiBusWrapper::new(epd_spi_dev, epd_dc, epd_rst, epd_busy);
-
 
     let controller = Ed2208Controller::new(GDEP073E01::WIDTH, GDEP073E01::HEIGHT);
     let mut driver = EpdBuilder::<_, GDEP073E01>::new(controller).build(bus);
