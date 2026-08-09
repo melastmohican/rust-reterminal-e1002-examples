@@ -1,5 +1,5 @@
 [target.xtensa-esp32s3-none-elf]
-linker = "/Users/mordor/.rustup/toolchains/esp/xtensa-esp-elf/esp-15.2.0_20250920/xtensa-esp-elf/bin/xtensa-esp32s3-elf-gcc"
+linker = "xtensa-esp32s3-elf-gcc"
 runner = "espflash flash --monitor --chip esp32s3 --log-format defmt"
 
 [env]
