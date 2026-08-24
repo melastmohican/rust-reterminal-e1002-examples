@@ -23,7 +23,7 @@ esp-println      = { version = "0.17.0", features = ["defmt-espflash", "esp32s3"
 critical-section = "1.2.0"
 static_cell      = "2.1.1"
 embedded-graphics = "0.8.1"
-epdsi            = { git = "https://github.com/melastmohican/epdsi", features = ["defmt"] }
+epdsi            = { version = "0.1.2", features = ["defmt"] }
 
 [dev-dependencies]
 nb               = "1.1.0"
