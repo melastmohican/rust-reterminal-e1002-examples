@@ -1,7 +1,28 @@
-//! # 6-Color EPD Graphic Demo Example using `epdsi` & `embedded-graphics`
+//! # 6-Color EPD Graphic Demo Example using `epdsi` & `embedded-graphics` (async)
 //!
 //! Comprehensive 6-color demo for the Seeed Studio reTerminal E1002 carrier board,
 //! based on the GxEPD2 Demo Arduino sketch for the GDEP073E01 e-Paper display.
+//!
+//! This board already runs `esp-rtos`'s Embassy executor, so — unlike the original version of
+//! this example — every `epdsi` call below is `.await`ed against `epdsi`'s async API
+//! (`default-features = false, features = ["defmt"]`) over `esp-hal`'s async SPI (`Spi::into_async()`)
+//! and GPIO (`Input`/`Output` already implement `embedded-hal-async`'s `Wait`/digital traits
+//! unconditionally in `esp-hal` 1.x).
+//!
+//! ## Note on the SPI device wrapper
+//!
+//! This uses a local [`AsyncRefCellDevice`], not `embedded_hal_bus::spi::ExclusiveDevice`, even
+//! though only one device is on this bus. `ExclusiveDevice`'s async impl (`embedded-hal-bus`
+//! 0.2.0, `"async"` feature) was tried first and compiles fine, but on this target — xtensa-esp32s3,
+//! `esp-hal`'s non-DMA `Spi::into_async()`, this crate's `lto = "fat"` / `opt-level = "s"` release
+//! profile — every refresh completed with no error and the expected ~25-30 s timing, yet the
+//! panel showed nothing but static on every one of the 6 screens: a silent data-corruption bug,
+//! not a busy-wait or timing one. `epd_ed2208_bmp.rs`'s hand-rolled `AsyncRefCellDevice` (needed
+//! there regardless, since it shares the bus with a blocking `embedded_sdmmc` SD card device)
+//! does not exhibit it, so it is used here too, confirmed fixed on hardware. The two
+//! implementations are logically equivalent — same `transaction()` body — so this looks like an
+//! `embedded-hal-bus`/toolchain interaction specific to `ExclusiveDevice` owning the bus by value
+//! rather than a `RefCell` borrow, not an `epdsi` bug.
 //!
 //! ## Display Specification
 //! - **Panel:** Good Display GDEP073E01 (7.3" 800x480 6-Color ACeP / Spectra 6 e-Paper display)
@@ -54,9 +75,15 @@ use embedded_graphics::{
     },
     text::{Baseline, Text},
 };
-use embedded_hal_bus::spi::RefCellDevice;
+use core::cell::RefCell;
+
+use embassy_time::Delay;
+use embedded_hal::digital::OutputPin;
+use embedded_hal::spi::{ErrorType, Operation};
+use embedded_hal_async::delay::DelayNs as AsyncDelayNs;
+use embedded_hal_async::spi::{SpiBus as AsyncSpiBus, SpiDevice as AsyncSpiDevice};
+use embedded_hal_bus::spi::DeviceError;
 use esp_hal::clock::CpuClock;
-use esp_hal::delay::Delay;
 use esp_hal::gpio::{Input, InputConfig, Level, Output, OutputConfig, Pull};
 use esp_hal::spi::Mode as SpiMode;
 use esp_hal::spi::master::{Config as SpiConfig, Spi};
@@ -65,6 +92,81 @@ use esp_println as _;
 use epdsi::SpiBusWrapper;
 use epdsi::controllers::Ed2208Controller;
 use epdsi::driver::EpdBuilder;
+
+/// `RefCell`-shared async `SpiDevice`, used instead of `embedded_hal_bus::spi::ExclusiveDevice`.
+/// See the module doc's "Note on the SPI device wrapper" for why: `ExclusiveDevice`'s async impl
+/// silently corrupted every refresh on this target, confirmed fixed by switching to this
+/// (otherwise unnecessary, since only one device is on this bus) `RefCell`-based equivalent.
+struct AsyncRefCellDevice<'a, BUS, CS, D> {
+    bus: &'a RefCell<BUS>,
+    cs: CS,
+    delay: D,
+}
+
+impl<'a, BUS, CS, D> AsyncRefCellDevice<'a, BUS, CS, D>
+where
+    CS: OutputPin,
+{
+    fn new(bus: &'a RefCell<BUS>, mut cs: CS, delay: D) -> Result<Self, CS::Error> {
+        cs.set_high()?;
+        Ok(Self { bus, cs, delay })
+    }
+}
+
+impl<BUS, CS, D> ErrorType for AsyncRefCellDevice<'_, BUS, CS, D>
+where
+    BUS: ErrorType,
+    CS: OutputPin,
+{
+    type Error = DeviceError<BUS::Error, CS::Error>;
+}
+
+impl<BUS, CS, D> AsyncSpiDevice for AsyncRefCellDevice<'_, BUS, CS, D>
+where
+    BUS: AsyncSpiBus,
+    CS: OutputPin,
+    D: AsyncDelayNs,
+{
+    // Held across `.await` deliberately: this bus has exactly one async consumer (the EPD, on
+    // this one `esp-rtos` task), so there is no concurrent borrower to conflict with, and no
+    // panic risk from re-entrant `borrow_mut()`.
+    #[allow(clippy::await_holding_refcell_ref)]
+    async fn transaction(&mut self, operations: &mut [Operation<'_, u8>]) -> Result<(), Self::Error> {
+        let mut bus = self.bus.borrow_mut();
+        self.cs.set_low().map_err(DeviceError::Cs)?;
+
+        let op_res = 'ops: {
+            for op in operations {
+                let res = match op {
+                    Operation::Read(buf) => bus.read(buf).await,
+                    Operation::Write(buf) => bus.write(buf).await,
+                    Operation::Transfer(read, write) => bus.transfer(read, write).await,
+                    Operation::TransferInPlace(buf) => bus.transfer_in_place(buf).await,
+                    Operation::DelayNs(ns) => match bus.flush().await {
+                        Err(e) => Err(e),
+                        Ok(()) => {
+                            self.delay.delay_ns(*ns).await;
+                            Ok(())
+                        }
+                    },
+                };
+                if let Err(e) = res {
+                    break 'ops Err(e);
+                }
+            }
+            Ok(())
+        };
+
+        let flush_res = bus.flush().await;
+        let cs_res = self.cs.set_high();
+
+        op_res.map_err(DeviceError::Spi)?;
+        flush_res.map_err(DeviceError::Spi)?;
+        cs_res.map_err(DeviceError::Cs)?;
+
+        Ok(())
+    }
+}
 use epdsi::panels::GDEP073E01;
 use epdsi::traits::{ColorChannel, EpdPanel, SevenColor};
 
@@ -1012,17 +1114,17 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
         esp_hal::interrupt::software::SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     esp_rtos::start(timg0.timer0, sw_interrupt.software_interrupt0);
 
-    let mut delay = Delay::new();
+    let mut delay = Delay;
 
     info!("\n============================================================");
-    info!("[E1002] epdsi ED2208 / GDEP073E01 Comprehensive Demo");
+    info!("[E1002] epdsi ED2208 / GDEP073E01 Comprehensive Demo (async)");
     info!("============================================================");
 
     // 1. Static frame buffer reference
     let frame_buf: &'static mut [u8; FRAME_BYTES] =
         unsafe { &mut *core::ptr::addr_of_mut!(FRAME_BUFFER) };
 
-    // 2. Configure shared SPI bus (HSPI: SCK=7, MISO=8, MOSI=9)
+    // 2. Configure SPI bus (HSPI: SCK=7, MISO=8, MOSI=9), async
     let spi_bus = Spi::new(
         peripherals.SPI2,
         SpiConfig::default()
@@ -1032,9 +1134,8 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
     .unwrap()
     .with_sck(peripherals.GPIO7)
     .with_miso(peripherals.GPIO8)
-    .with_mosi(peripherals.GPIO9);
-
-    let spi_bus_cell = core::cell::RefCell::new(spi_bus);
+    .with_mosi(peripherals.GPIO9)
+    .into_async();
 
     // 3. Configure EPD driver signals
     let epd_cs = Output::new(peripherals.GPIO10, Level::High, OutputConfig::default());
@@ -1045,14 +1146,15 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
         InputConfig::default().with_pull(Pull::Up),
     );
 
-    let epd_spi_dev = RefCellDevice::new_no_delay(&spi_bus_cell, epd_cs).unwrap();
+    let spi_bus_cell = RefCell::new(spi_bus);
+    let epd_spi_dev = AsyncRefCellDevice::new(&spi_bus_cell, epd_cs, Delay).unwrap();
     let bus = SpiBusWrapper::new(epd_spi_dev, epd_dc, epd_rst, epd_busy);
 
     let controller = Ed2208Controller::new(GDEP073E01::WIDTH, GDEP073E01::HEIGHT);
     let mut driver = EpdBuilder::<_, GDEP073E01>::new(controller).build(bus);
 
     info!("[EPD] Initializing ED2208 controller hardware...");
-    if let Err(_e) = driver.init(&mut delay) {
+    if let Err(_e) = driver.init(&mut delay).await {
         error!("[EPD] Driver initialization failed!");
     } else {
         info!("[EPD] Driver initialized successfully.");
@@ -1074,11 +1176,11 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
             draw_fn(&mut target);
 
             info!("[EPD] Writing frame buffer to display driver...");
-            if let Err(_e) = driver.write_frame(ColorChannel::Color7(0), frame_buf) {
+            if let Err(_e) = driver.write_frame(ColorChannel::Color7(0), frame_buf).await {
                 error!("[EPD] Write frame failed for {}", name);
             } else {
                 info!("[EPD] Refreshing display (~25-30s)...");
-                if let Err(_e) = driver.refresh(&mut delay) {
+                if let Err(_e) = driver.refresh(&mut delay).await {
                     error!("[EPD] Refresh failed for {}", name);
                 } else {
                     info!("[EPD] Refresh complete for {}.", name);
@@ -1090,7 +1192,7 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
         }
 
         info!("[EPD] Demo sequence complete. Putting display into deep sleep.");
-        let _ = driver.sleep(&mut delay);
+        let _ = driver.sleep(&mut delay).await;
     }
 
     info!("[E1002] Entering idle loop.");
