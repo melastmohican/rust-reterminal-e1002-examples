@@ -25,9 +25,7 @@ static_cell      = "2.1.1"
 embedded-graphics = "0.8.1"
 embedded-hal      = "1.0.0"
 embedded-hal-async = "1.0.0"
-# Phase 5 hardware gate for epdsi 0.2.0 (unreleased) — path dependency until it's published;
-# swap to `epdsi = { version = "0.2", default-features = false, features = ["defmt"] }` then.
-epdsi            = { path = "../epdsi", default-features = false, features = ["defmt"] }
+epdsi            = { version = "0.2", default-features = false, features = ["defmt"] }
 
 [dev-dependencies]
 nb               = "1.1.0"
