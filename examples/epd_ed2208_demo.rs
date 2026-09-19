@@ -59,6 +59,7 @@
 #![no_std]
 #![no_main]
 
+use core::cell::RefCell;
 use defmt::{error, info};
 use embassy_time::{Duration, Timer};
 use embedded_graphics::{
@@ -75,7 +76,6 @@ use embedded_graphics::{
     },
     text::{Baseline, Text},
 };
-use core::cell::RefCell;
 
 use embassy_time::Delay;
 use embedded_hal::digital::OutputPin;
@@ -131,7 +131,10 @@ where
     // this one `esp-rtos` task), so there is no concurrent borrower to conflict with, and no
     // panic risk from re-entrant `borrow_mut()`.
     #[allow(clippy::await_holding_refcell_ref)]
-    async fn transaction(&mut self, operations: &mut [Operation<'_, u8>]) -> Result<(), Self::Error> {
+    async fn transaction(
+        &mut self,
+        operations: &mut [Operation<'_, u8>],
+    ) -> Result<(), Self::Error> {
         let mut bus = self.bus.borrow_mut();
         self.cs.set_low().map_err(DeviceError::Cs)?;
 
