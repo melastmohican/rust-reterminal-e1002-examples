@@ -204,6 +204,28 @@ Sequences through 6 distinct screens rendered using `embedded-graphics` primitiv
 cargo run --release --example epd_ed2208_demo
 ```
 
+#### epd_ed2208_deghost
+
+Isolates `epdsi`'s `EpdDriver::de_ghost()` (a clean-sweep refresh ported from `Adafruit_ACEP::deGhost()`) as a before/after comparison on the 7.3" Good Display GDEP073E01 panel.
+
+A uniform full-panel color swap gives ghosting nothing to leave a trace of, so this writes a bold 6-color vertical-bar pattern, then swaps straight to blank white and refreshes again. The blank screen is the one to inspect, for a faint outline of the bars. Runs two pattern-to-blank cycles twice: once with plain refreshes, once with `de_ghost()` called between the pattern and the blank. Compare each blank against the matching one in the other phase.
+
+```bash
+cargo run --release --example epd_ed2208_deghost
+```
+
+#### epd_ed2208_partial_refresh
+
+Demonstrates `epdsi`'s `Ed2208Controller::trigger_partial_refresh()`: refreshes only a caller-given window instead of always widening to the full panel, on the 7.3" Good Display GDEP073E01 panel.
+
+Fills the panel blue, then cycles a 200x100 window through Red, Green, Yellow, White, and Black, each one via a partial refresh. A final plain `refresh()` with the window still black shows the contrast against a full-panel update.
+
+**Bench-confirmed real limitation:** the blue background outside the window visibly fades starting from the very first partial refresh, not after many repeated ones. This is why Zephyr's own `ed2208_gca` driver refuses to do partial refresh at all. Follow any partial refresh with a prompt full one; don't chain them expecting the untouched area to hold. No speed benefit either way: full and partial refresh both take the same ~30-35s on this controller.
+
+```bash
+cargo run --release --example epd_ed2208_partial_refresh
+```
+
 #### epd_ed2208_bmp
 
 Displays 24-bit or 32-bit uncompressed BMP images from a microSD card on the 7.3" Good Display GDEP073E01 6-Color ACeP panel using the local `epdsi` driver library (`Ed2208Controller`).
