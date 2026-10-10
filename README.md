@@ -269,7 +269,7 @@ For an A/B, keep the existing `IMAGE.BMP` (`images/image.bmp`, the nearest-quant
 
 **Bench result (reTerminal E1002, 9 Oct 2026):** on the mocha photo, nearest-color snapping posterizes the image into flat yellow, dark red, black and white patches and loses the mid-tones and fine fur detail. Dithering keeps the tonal range and detail, so the photo still reads as the same photo. The cost is color: the dithered result is duller and browner than the source, and less saturated than the nearest-color version. That is expected, because the palette is ideal primaries (pure `255,255,0` yellow and so on) while real Spectra 6 inks are more muted, and there is no gamma handling. For photos the dithered result is the better one; nearest-color only wins on flat graphics. A palette calibrated to measured ink colors would bring saturation back, but `epdsi` does not provide one.
 
-![reTerminal E1002 dithered BMP example](images/epd_ed2208_bmp_dither.jpg)
+![reTerminal E1002 dithered BMP example](images/dither.jpg)
 
 ```bash
 cargo run --release --example epd_ed2208_bmp_dither
@@ -290,7 +290,7 @@ python3 convert_image.py images/mocha800x480.jpg --preview
 Included sample images in `./images/`:
 - `epd_ed2208_bmp.jpg`: Photo demonstration of the reTerminal E1002 displaying a 6-color BMP image on the 7.3" EPD panel.
 - `image.bmp` / `image_preview.png`: Pre-converted 800x480 6-color sample BMP image.
-- `epd_ed2208_bmp_dither.jpg`: Photo of the reTerminal E1002 showing the mocha photo dithered by `epd_ed2208_bmp_dither`.
+- `dither.jpg`: Photo of the reTerminal E1002 showing the mocha photo dithered by `epd_ed2208_bmp_dither`.
 - `image_fullcolor.bmp`: The same photo as `image.bmp`, resized but not quantized (about 90,000 distinct colors). Copy to the SD card as `DITHER.BMP` for `epd_ed2208_bmp_dither`.
 - `mocha800x480.jpg` / `mocha800x480_preview.png`: Sample source photo and 6-color e-ink preview.
 
