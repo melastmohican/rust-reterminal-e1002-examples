@@ -241,6 +241,40 @@ cargo run --release --example epd_ed2208_bmp
 ![reTerminal E1002 ED2208 BMP Example](images/epd_ed2208_bmp.jpg)
 
 
+#### epd_ed2208_dither
+
+Exercises `epdsi`'s Bayer ordered dithering (`graphics::dither::dither_seven`) on the 7.3" Good Display GDEP073E01 Spectra 6 panel.
+
+Renders six 80 px bands, each a smooth 800 px ramp: black to white, black to red, black to green, black to blue, black to yellow, and a full-saturation hue sweep. Every pixel is quantized to the six native colors with a 4x4 Bayer matrix, with no line buffer and no heap beyond the 192,000 byte packed frame. Judge the dot structure, not color accuracy: the palette is ideal primaries, and real Spectra 6 inks are more muted. Bench-confirmed on the reTerminal E1002: the ramps show a regular fine dot grid with no stripes or seams, and the colors come out duller than on a monitor.
+
+Needs `epdsi` 0.6.2 or later with the `graphics` feature, which is not enabled by default here. `Cargo.toml` enables it.
+
+```bash
+cargo run --release --example epd_ed2208_dither
+```
+
+#### epd_ed2208_bmp_dither
+
+Same pipeline as `epd_ed2208_bmp`, but each pixel goes through `epdsi`'s Bayer ordered dithering (`graphics::dither::dither_seven`) instead of nearest-color snapping.
+
+It reads `DITHER.BMP` only, so it never overwrites or silently dithers the `IMAGE.BMP` that `epd_ed2208_bmp` uses. It needs a full-color BMP: copy `images/image_fullcolor.bmp` to the card as `DITHER.BMP`, or make your own:
+
+```bash
+python3 convert_image.py images/mocha800x480.jpg /Volumes/SD/DITHER.BMP --no-quantize
+```
+
+For an A/B, keep the existing `IMAGE.BMP` (`images/image.bmp`, the nearest-quantized rendition of the same photo) on the card, run `epd_ed2208_bmp`, then run this one. With no `DITHER.BMP` it dithers the same six gradient bands as `epd_ed2208_dither`.
+
+**SD card file names:** the SD reader only understands 8.3 short names. Use all-uppercase or all-lowercase, 8 characters or fewer, no spaces. macOS stores a mixed-case name such as `DITHER.bmp` as a long name with a generated short name (`DITHE~19.BMP`), and the example then reports "Falling back to gradient bands" even though the file is on the card. Fix a bad name with `mv DITHER.bmp tmp.bmp && mv tmp.bmp DITHER.BMP`, then `dot_clean` the card. This applies to `epd_ed2208_bmp` too.
+
+**Bench result (reTerminal E1002, 9 Oct 2026):** on the mocha photo, nearest-color snapping posterizes the image into flat yellow, dark red, black and white patches and loses the mid-tones and fine fur detail. Dithering keeps the tonal range and detail, so the photo still reads as the same photo. The cost is color: the dithered result is duller and browner than the source, and less saturated than the nearest-color version. That is expected, because the palette is ideal primaries (pure `255,255,0` yellow and so on) while real Spectra 6 inks are more muted, and there is no gamma handling. For photos the dithered result is the better one; nearest-color only wins on flat graphics. A palette calibrated to measured ink colors would bring saturation back, but `epdsi` does not provide one.
+
+![reTerminal E1002 dithered BMP example](images/epd_ed2208_bmp_dither.jpg)
+
+```bash
+cargo run --release --example epd_ed2208_bmp_dither
+```
+
 #### Image Conversion Tool (`convert_image.py`)
 
 A Python helper script is provided in the repository root to convert any input photo or image (JPG, PNG, WEBP, etc.) into an uncompressed 800x480 BMP formatted for the reTerminal E1002 microSD card:
@@ -256,6 +290,8 @@ python3 convert_image.py images/mocha800x480.jpg --preview
 Included sample images in `./images/`:
 - `epd_ed2208_bmp.jpg`: Photo demonstration of the reTerminal E1002 displaying a 6-color BMP image on the 7.3" EPD panel.
 - `image.bmp` / `image_preview.png`: Pre-converted 800x480 6-color sample BMP image.
+- `epd_ed2208_bmp_dither.jpg`: Photo of the reTerminal E1002 showing the mocha photo dithered by `epd_ed2208_bmp_dither`.
+- `image_fullcolor.bmp`: The same photo as `image.bmp`, resized but not quantized (about 90,000 distinct colors). Copy to the SD card as `DITHER.BMP` for `epd_ed2208_bmp_dither`.
 - `mocha800x480.jpg` / `mocha800x480_preview.png`: Sample source photo and 6-color e-ink preview.
 
 
