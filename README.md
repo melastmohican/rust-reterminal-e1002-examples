@@ -226,6 +226,18 @@ Fills the panel blue, then cycles a 200x100 window through Red, Green, Yellow, W
 cargo run --release --example epd_ed2208_partial_refresh
 ```
 
+#### epd_ed2208_partial_alignment
+
+Bench test for `epdsi`'s backlog item `ed2208-partial-window-alignment` on the 7.3" GDEP073E01 panel. A Zephyr PR claims a partial window must start and end on a multiple of 4 px, because the controller reads an even number of bytes per row. `epdsi` 0.9.3 and earlier accepted any even `x` and `w`.
+
+Fills the panel yellow, then writes three 24-row bands of black and white vertical stripes with a partial refresh each: `x=4 w=386` (193 bytes per row), `x=4 w=388` (194 bytes, the control), and `x=2 w=388`. A sheared window shows slanted or broken stripes. Takes about two minutes; photograph the panel after each band.
+
+**Bench result (22 Oct 2026):** `x=4 w=386` and `x=2 w=388` sheared, `x=4 w=388` was clean. `epdsi` releases after 0.9.3 reject the two sheared windows, so pin `epdsi` to 0.9.3 or earlier to reproduce.
+
+```bash
+cargo run --release --example epd_ed2208_partial_alignment
+```
+
 #### epd_ed2208_fast_init
 
 Bench A/B for Good Display's `EPD_init_fast` on the 7.3" GDEP073E01 panel. It is a throwaway test for `epdsi`'s backlog item `ed2208-vendor-fast-init`, not a recommended init.
