@@ -238,6 +238,18 @@ Power-cycle the board first and do not interrupt the run.
 cargo run --release --example epd_ed2208_fast_init
 ```
 
+#### epd_ed2208_power_cycle
+
+Bench A/B for the per-refresh power cycle on the 7.3" GDEP073E01 panel. It is a throwaway test for `epdsi`'s backlog item `ed2208-per-refresh-power-cycle`, not a recommended flow.
+
+`epdsi` powers the rails on once in init and sends only `DRF` per refresh. Good Display's solid-colour demo screens, M5GFX and Inkplate send `PON`, a BTST2 rewrite, `DRF` and `POF` on every refresh instead. This example runs five chained updates under three flows: power-on-once (current `epdsi`), power-cycle per refresh, and power-cycle with Inkplate's init value for BTST2 (`17 17`, rewritten to `49` after `PON`). Each update redraws six bars with the colours rotated one place, so nothing repeats between updates.
+
+It logs every refresh time and holds 25 s after update 1 and update 5 of each flow so you can photograph the panel. Compare blue and white for fade. The run takes about 10 minutes. Power-cycle the board first and do not interrupt it.
+
+```bash
+cargo run --release --example epd_ed2208_power_cycle
+```
+
 #### epd_ed2208_bmp
 
 Displays 24-bit or 32-bit uncompressed BMP images from a microSD card on the 7.3" Good Display GDEP073E01 6-Color ACeP panel using the local `epdsi` driver library (`Ed2208Controller`).
