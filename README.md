@@ -226,6 +226,18 @@ Fills the panel blue, then cycles a 200x100 window through Red, Green, Yellow, W
 cargo run --release --example epd_ed2208_partial_refresh
 ```
 
+#### epd_ed2208_fast_init
+
+Bench A/B for Good Display's `EPD_init_fast` on the 7.3" GDEP073E01 panel. It is a throwaway test for `epdsi`'s backlog item `ed2208-vendor-fast-init`, not a recommended init.
+
+Draws the same six-bar swatch (black, white, yellow, red, blue, green) three times: after `epdsi`'s plain init, after the vendor fast init sent as raw commands, and after the plain init again as the control. It logs the init and refresh time for each and holds 30 s so you can photograph the panel. Compare the refresh times and how saturated the bars look. The vendor sequence differs from the plain one in nine writes (PWRR, BTST2 and PLL changed, and IPC, TSE, VDCS, AGID, CCSET and TSSET added).
+
+Power-cycle the board first and do not interrupt the run.
+
+```bash
+cargo run --release --example epd_ed2208_fast_init
+```
+
 #### epd_ed2208_bmp
 
 Displays 24-bit or 32-bit uncompressed BMP images from a microSD card on the 7.3" Good Display GDEP073E01 6-Color ACeP panel using the local `epdsi` driver library (`Ed2208Controller`).
