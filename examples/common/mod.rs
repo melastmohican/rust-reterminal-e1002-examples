@@ -34,7 +34,10 @@ use epdsi::panels::GDEP073E01;
 use epdsi::traits::{ColorChannel, EpdPanel};
 use esp_hal::Async;
 use esp_hal::gpio::{Input, InputConfig, Level, Output, OutputConfig, Pull};
-use esp_hal::peripherals::{GPIO7, GPIO8, GPIO9, GPIO10, GPIO11, GPIO12, GPIO13, PSRAM, SPI2};
+use esp_hal::i2c::master::{Config as I2cConfig, I2c};
+use esp_hal::peripherals::{
+    GPIO7, GPIO8, GPIO9, GPIO10, GPIO11, GPIO12, GPIO13, GPIO39, GPIO40, I2C1, PSRAM, SPI2,
+};
 use esp_hal::rtc_cntl::{SocResetReason, reset_reason};
 use esp_hal::spi::Mode as SpiMode;
 use esp_hal::spi::master::{Config as SpiConfig, Spi};
@@ -58,6 +61,21 @@ pub async fn halt() -> ! {
 /// leaves the panel as it is, so the last good picture stays. Only the first run after power-on draws the error.
 pub fn after_loop_reset() -> bool {
     reset_reason(Cpu::ProCpu) == Some(SocResetReason::CoreSw)
+}
+
+/// True when USB power is present, false on battery alone, `None` when the charger does not answer. Reads the
+/// power-good bit (bit 2 of REG08) of the SY6974B charger on its own I2C bus, SDA GPIO39 and SCL GPIO40. There is
+/// no VBUS pin. Checked on the board with `charger`: 1 on USB, 0 on battery.
+pub fn on_usb(i2c1: I2C1<'static>, sda: GPIO39<'static>, scl: GPIO40<'static>) -> Option<bool> {
+    const CHARGER: u8 = 0x6B;
+    const REG_STATUS: u8 = 0x08;
+    let mut i2c = I2c::new(i2c1, I2cConfig::default())
+        .ok()?
+        .with_sda(sda)
+        .with_scl(scl);
+    let mut status = [0u8];
+    i2c.write_read(CHARGER, &[REG_STATUS], &mut status).ok()?;
+    Some(status[0] & 0b100 != 0)
 }
 
 /// Waits `minutes` awake, then resets the chip in software, so `main` runs again from the start. Do not call
