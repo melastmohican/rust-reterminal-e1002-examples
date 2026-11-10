@@ -50,7 +50,7 @@
 
 use defmt::info;
 use embassy_time::{Duration, Timer};
-use esp_hal::analog::adc::{Adc, AdcConfig, Attenuation};
+use esp_hal::analog::adc::{Adc, AdcCalCurve, AdcConfig, Attenuation};
 use esp_hal::clock::CpuClock;
 use esp_hal::gpio::{Level, Output, OutputConfig};
 use esp_println as _;
@@ -74,7 +74,8 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
 
     // Configure ADC1 for GPIO 1 with 11dB attenuation (~0 - 3.1V input range)
     let mut adc_config = AdcConfig::new();
-    let mut batt_adc_pin = adc_config.enable_pin(peripherals.GPIO1, Attenuation::_11dB);
+    let mut batt_adc_pin =
+        adc_config.enable_pin_with_cal::<_, AdcCalCurve<_>>(peripherals.GPIO1, Attenuation::_11dB);
     let mut adc = Adc::new(peripherals.ADC1, adc_config);
 
     loop {
@@ -87,8 +88,9 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
         // Turn off divider circuit to prevent passive battery discharge
         batt_en.set_low();
 
-        // 12-bit ADC raw range 0..4095 mapped to ~3300 mV full scale
-        let mv = (raw_val as u32 * 3300) / 4095;
+        // The curve calibration returns millivolts. Without a calibration scheme esp-hal never sets up the ADC
+        // reference, and a 2 V input then reads 4095.
+        let mv = raw_val as u32;
 
         // The voltage divider halves the battery voltage, so multiply by 2
         let batt_mv = mv * 2;
@@ -96,7 +98,7 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
         let batt_v_dec = (batt_mv % 1000) / 10;
 
         info!(
-            "[batt] ADC Raw: {} ({} mV) -> Battery: {}.{:02} V",
+            "[batt] ADC {} ({} mV) -> Battery: {}.{:02} V",
             raw_val, mv, batt_v_int, batt_v_dec
         );
 

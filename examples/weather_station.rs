@@ -53,7 +53,7 @@ use common::{EpdBuffer, net};
 use defmt::{error, info};
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
-use esp_hal::analog::adc::{Adc, AdcConfig, Attenuation};
+use esp_hal::analog::adc::{Adc, AdcCalCurve, AdcConfig, Attenuation};
 use esp_hal::clock::CpuClock;
 use esp_hal::gpio::{Level, Output, OutputConfig};
 use esp_println as _;
@@ -618,13 +618,15 @@ async fn main(spawner: Spawner) -> ! {
     // Battery: the divider halves the voltage, so x2. Enable, sample, disable to save the cell.
     let mut batt_en = Output::new(p.GPIO21, Level::Low, OutputConfig::default());
     let mut adc_config = AdcConfig::new();
-    let mut batt_pin = adc_config.enable_pin(p.GPIO1, Attenuation::_11dB);
+    let mut batt_pin =
+        adc_config.enable_pin_with_cal::<_, AdcCalCurve<_>>(p.GPIO1, Attenuation::_11dB);
     let mut adc = Adc::new(p.ADC1, adc_config);
     batt_en.set_high();
     Timer::after(Duration::from_millis(5)).await;
     let raw: u16 = nb::block!(adc.read_oneshot(&mut batt_pin)).unwrap_or(0);
     batt_en.set_low();
-    let battery_volts = (raw as f32 * 3.3 / 4095.0) * 2.0;
+    // `raw` is already in mV: with the curve calibration the reading is calibrated and the ADC reference is set up.
+    let battery_volts = raw as f32 / 1000.0 * 2.0;
     info!("battery {} mV", (battery_volts * 1000.0) as u32);
 
     let mut frame = common::new_frame();
