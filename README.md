@@ -250,6 +250,20 @@ Power-cycle the board first and do not interrupt the run.
 cargo run --release --example epd_ed2208_fast_init
 ```
 
+#### epd_ed2208_pll
+
+Bench A/B for the refresh-speed register (PLL, `0x30`) on the 7.3" GDEP073E01 panel. Pimoroni's Inky Impression 7.3" driver sends the same ED2208 commands as `epdsi` but lets you pick PLL `0x08` (normal), `0x04` (75 Hz) or `0x07` (120 Hz), and warns that faster speeds wash out blue and green. `epdsi` always sends `0x08`.
+
+Draws the same six-bar swatch four times: PLL `0x08`, `0x04`, `0x07`, then `0x08` again as the control. It logs the init and refresh time for each and holds 30 s so you can photograph the panel. PLL is written after `driver.init`, so after `PON`; if the times do not move, the value may have been ignored there.
+
+Result on the reTerminal E1002 (9 Nov 2026): `0x08` 28.4 s, `0x04` 21.9 s, `0x07` 14.3 s, control `0x08` 28.4 s. The register works after `PON`. In photos blue and green get duller as the speed goes up, black, white and yellow do not change.
+
+Power-cycle the board first and do not interrupt the run.
+
+```bash
+cargo run --release --example epd_ed2208_pll
+```
+
 #### epd_ed2208_power_cycle
 
 Bench A/B for the per-refresh power cycle on the 7.3" GDEP073E01 panel. It is a throwaway test for `epdsi`'s backlog item `ed2208-per-refresh-power-cycle`, not a recommended flow.
@@ -337,10 +351,6 @@ Included sample images in `./images/`:
 
 Ports of the GxEPD2 sketches for the reTerminal E1002, sharing `examples/common/` (panel, frame buffer in PSRAM, text, Wi-Fi/SNTP/HTTPS). `mandelbrot` and `quotables` run once and stop; reset to redraw. `news` and `weather_station` retry a failed request 3 times, then deep-sleep and refresh every 30 minutes (10 after a failure, keeping the last good picture); deep sleep drops the USB serial log. A full refresh takes about 30 s. The fonts are `u8g2` bitmap fonts of about the sketches' sizes, so the italic faces are upright.
 
-![reTerminal E1002 Mandelbrot example](images/mandelbrot.jpg)
-
-![reTerminal E1002 weather station example](images/weather_station.jpg)
-
 Wi-Fi credentials (and the NewsAPI key) live in `secret.rs`, which is git-ignored. Copy the template and edit it:
 
 ```bash
@@ -351,7 +361,7 @@ cargo run --release --example quotables
 The examples will not build without `secret.rs`; CI copies the placeholder. The hardware-free code (parsing, mappings, drawing) is tested on the host with `./host-tests/run.sh`.
 
 #### mandelbrot
-
+![reTerminal E1002 Mandelbrot example](images/mandelbrot.jpg)
 The whole Mandelbrot set, computed in `f32` straight into the frame buffer: black inside, white/yellow/red/green/blue bands by escape time. No Wi-Fi. Edit `CENTER_X`, `CENTER_Y` and `RANGE_X` to zoom.
 
 ```bash
@@ -375,7 +385,7 @@ cargo run --release --example news
 ```
 
 #### weather_station
-
+![reTerminal E1002 weather station example](images/weather_station.jpg)
 Open-Meteo dashboard (no key): current weather, battery level (GPIO1/GPIO21), a six-hour temperature and rain-chance graph, and a six-day strip. Set `CITY`, `LATITUDE`, `LONGITUDE`, `USERNAME` and `METRIC_UNITS` in the file. Icons are Lucide (ISC, `assets/LICENSE-lucide.txt`).
 
 ```bash
