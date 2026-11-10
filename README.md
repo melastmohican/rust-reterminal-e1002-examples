@@ -29,6 +29,8 @@ This repository contains idiomatic Rust examples for the **Seeed Studio reTermin
 | | **Buzzer** | GPIO45 | Passive Piezo Buzzer (LEDC PWM) |
 | | **Battery ADC** | GPIO1 | ADC1 Channel 0 (1:2 Voltage Divider) |
 | | **Battery Enable** | GPIO21 | Active-HIGH Voltage Divider Circuit Enable |
+| | **Charger I2C** | GPIO39 (SDA), GPIO40 (SCL) | SY6974B at `0x6B`, own bus |
+| **Microphone** | **PDM_EN / CLK / DATA** | GPIO38 / GPIO42 / GPIO41 | MSM261DHP006 PDM MEMS mic |
 | **Serial Logging** | **UART1 TX** | GPIO43 | Connected to onboard USB-to-UART bridge |
 | | **UART1 RX** | GPIO44 | Connected to onboard USB-to-UART bridge |
 
@@ -40,7 +42,7 @@ This repository contains idiomatic Rust examples for the **Seeed Studio reTermin
 
 #### battery
 
-Reads the Li-Po battery voltage through the onboard 1:2 resistor voltage divider. Drives the active-HIGH enable pin (`GPIO21`) HIGH before sampling ADC1 (`GPIO1`) and LOW afterward to avoid wasting battery current through the divider circuit.
+Reads the Li-Po battery voltage through the onboard 1:2 resistor voltage divider. Drives the active-HIGH enable pin (`GPIO21`) HIGH before sampling ADC1 (`GPIO1`) and LOW afterward to avoid wasting battery current through the divider circuit. The pin is read with the curve-calibrated ADC, which returns millivolts. Without a calibration scheme esp-hal never sets up the ADC reference and a 2 V input reads 4095.
 
 ```bash
 cargo run --example battery
@@ -71,6 +73,14 @@ $$V_{\text{batt}} = 2 \times V_{\text{adc}}$$
 
 ---
 
+#### charger
+
+Probes the SY6974B Li-Po charger on its own I2C bus (`GPIO39` SDA, `GPIO40` SCL) at address `0x6B`. Bit 2 of REG08 (`PG`, power good) is 1 on USB and 0 on battery alone, which is the only way to tell them apart: there is no VBUS pin. The user LED blinks the answer every 2 s (once for USB, twice for battery, three times if the charger does not answer), because the serial link is the USB cable. `news` and `weather_station` use the same check (`common::on_usb`) to refresh every 30 minutes on USB and every 120 on battery. The part is in the schematic but not in Seeed's product page.
+
+```bash
+cargo run --release --example charger
+```
+
 ### Button & Input Examples
 
 #### button
@@ -99,6 +109,14 @@ cargo run --example button
 ---
 
 ### Audio & PWM Examples
+
+#### mic
+
+Prints the level of the onboard PDM microphone (MSM261DHP006) every 200 ms: `GPIO38` powers it, `GPIO42` is its clock and `GPIO41` its data. esp-hal 1.1 has no PDM receive mode, so I2S clocks the mic at 2.4 MHz and captures the raw bit stream by DMA, and the example counts the ones per 32-bit word. The level is the peak deviation of a 0.2 ms average from the running mean, x100. Measured on the board: about 7 in a quiet room, 13 to 44 for speech and up to about 1000 for a close clap. It measures loudness, not audio quality.
+
+```bash
+cargo run --release --example mic
+```
 
 #### buzzer
 
