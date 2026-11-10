@@ -534,7 +534,8 @@ mod ui {
         let day_w = SCREEN_W / SHOWN_DAYS as i32;
         let start_y = WEEK_Y + 28;
         for i in 0..SHOWN_DAYS {
-            let x = i as i32 * day_w + (day_w - ICON) / 2 - 10;
+            // Icon, then the two temperatures: about 115 px, of the 133 px a column has.
+            let x = i as i32 * day_w + 8;
             text(
                 t,
                 &common::SANS_12,
@@ -552,7 +553,7 @@ mod ui {
             );
 
             // High: red up-triangle.
-            let ax = x + 70;
+            let ax = x + 62;
             let mut ay = start_y + 20;
             triangle(
                 t,

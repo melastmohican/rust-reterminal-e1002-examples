@@ -6,7 +6,7 @@ mod support;
 use host_tests::gfx::{Color6, EpdBuffer, new_frame};
 use host_tests::icons;
 use host_tests::weather_station::*;
-use support::count;
+use support::{count, nibble};
 
 const FORECAST: &[u8] = include_bytes!("../fixtures/openmeteo_forecast.json");
 
@@ -275,4 +275,20 @@ fn the_error_screen_is_red_over_black_on_white() {
     );
     assert!(count(&frame, Color6::Red) > 100);
     assert!(count(&frame, Color6::Black) > 100);
+}
+
+#[test]
+fn the_last_forecast_column_fits_on_the_screen() {
+    // The widest temperatures, with a minus sign, so the right-hand text is as long as it gets.
+    let mut w = parse(FORECAST).unwrap();
+    w.daily_max = [-25.0; DAYS];
+    w.daily_min = [-35.0; DAYS];
+    let mut frame = new_frame();
+    draw_dashboard(&mut EpdBuffer::new(&mut frame), &w, 3.9);
+    // Inside the band's 1 px border, nothing is drawn in the last few columns, so nothing is cut off.
+    for y in WEEK_Y as usize + 1..SCREEN_H as usize - 1 {
+        for x in SCREEN_W as usize - 5..SCREEN_W as usize - 1 {
+            assert_eq!(nibble(&frame, x, y), Color6::White as u8, "ink at {x},{y}");
+        }
+    }
 }
