@@ -81,6 +81,14 @@ Probes the SY6974B Li-Po charger on its own I2C bus (`GPIO39` SDA, `GPIO40` SCL)
 cargo run --release --example charger
 ```
 
+#### power_probe
+
+Bench example for the battery-boot fault: a boot on battery alone draws noise on the panel, while the same firmware on USB and the Arduino GxEPD2 sketch on battery are clean. With no serial log on battery, the user LED reports in a loop: the reset reason, the stage reached (Wi-Fi, panel init, refresh), the lowest battery voltage seen (a task samples it every 10 ms) and the refresh time. Measured so far: no brownout, 3.8 V to 3.9 V at the lowest, a normal 25 to 29 s refresh, and noise with or without Wi-Fi (`WIFI` constant). The cause is not found; see the header of the file.
+
+```bash
+cargo run --release --example power_probe
+```
+
 ### Button & Input Examples
 
 #### button
