@@ -337,6 +337,10 @@ Included sample images in `./images/`:
 
 Ports of the GxEPD2 sketches for the reTerminal E1002, sharing `examples/common/` (panel, frame buffer in PSRAM, text, Wi-Fi/SNTP/HTTPS). `mandelbrot` and `quotables` run once and stop; reset to redraw. `news` and `weather_station` retry a failed request 3 times, then deep-sleep and refresh every 30 minutes (10 after a failure, keeping the last good picture); deep sleep drops the USB serial log. A full refresh takes about 30 s. The fonts are `u8g2` bitmap fonts of about the sketches' sizes, so the italic faces are upright.
 
+![reTerminal E1002 Mandelbrot example](images/mandelbrot.jpg)
+
+![reTerminal E1002 weather station example](images/weather_station.jpg)
+
 Wi-Fi credentials (and the NewsAPI key) live in `secret.rs`, which is git-ignored. Copy the template and edit it:
 
 ```bash
