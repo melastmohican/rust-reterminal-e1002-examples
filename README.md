@@ -264,6 +264,18 @@ Power-cycle the board first and do not interrupt the run.
 cargo run --release --example epd_ed2208_pll
 ```
 
+#### epd_ed2208_wake
+
+Bench example for a fault found on 9 Nov 2026: after an `esp-hal` deep or light sleep, a Wi-Fi join and fetch before the panel init makes every later refresh draw brown or yellow noise. A software reset does not clear it; only removing the power does. This is why `weather_station` and `news` wait awake and reset instead of sleeping.
+
+Draws six colour bars, sleeps 60 s, wakes and draws them in reverse order. Four switches (`PSRAM_FRAME`, `WIFI`, `RESET_AFTER_WAKE`, `LIGHT_SLEEP`) bisect the cause; the header lists every variant tried and its result. The defaults reproduce the fault (needs `secret.rs`). The cause is not found.
+
+Power-cycle the board first and do not interrupt the run. After a noisy run, power-cycle again.
+
+```bash
+cargo run --release --example epd_ed2208_wake
+```
+
 #### epd_ed2208_power_cycle
 
 Bench A/B for the per-refresh power cycle on the 7.3" GDEP073E01 panel. It is a throwaway test for `epdsi`'s backlog item `ed2208-per-refresh-power-cycle`, not a recommended flow.
@@ -349,7 +361,7 @@ Included sample images in `./images/`:
 
 ### Wi-Fi & Generative Display Examples
 
-Ports of the GxEPD2 sketches for the reTerminal E1002, sharing `examples/common/` (panel, frame buffer in PSRAM, text, Wi-Fi/SNTP/HTTPS). `mandelbrot` and `quotables` run once and stop; reset to redraw. `news` and `weather_station` retry a failed request 3 times, then deep-sleep and refresh every 30 minutes (10 after a failure, keeping the last good picture); deep sleep drops the USB serial log. A full refresh takes about 30 s. The fonts are `u8g2` bitmap fonts of about the sketches' sizes, so the italic faces are upright.
+Ports of the GxEPD2 sketches for the reTerminal E1002, sharing `examples/common/` (panel, frame buffer in PSRAM, text, Wi-Fi/SNTP/HTTPS). `mandelbrot` and `quotables` run once and stop; reset to redraw. `news` and `weather_station` retry a failed request 3 times (each gives up after 30 s), then wait awake with Wi-Fi off and reset themselves every 30 minutes (10 after a failure, keeping the last good picture). They do not deep-sleep: see `epd_ed2208_wake` below. A full refresh takes about 30 s. The fonts are `u8g2` bitmap fonts of about the sketches' sizes, so the italic faces are upright.
 
 Wi-Fi credentials (and the NewsAPI key) live in `secret.rs`, which is git-ignored. Copy the template and edit it:
 

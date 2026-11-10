@@ -120,10 +120,31 @@ pub async fn unix_time(stack: Stack<'static>) -> Option<i64> {
     i64::try_from(result.seconds).ok()
 }
 
+/// Longest a whole request may take, DNS and the TLS handshake included. A stalled server or link would
+/// otherwise block forever.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+
 /// GET `url` over HTTPS into `body` and returns the number of bytes of the response body. Fails
 /// (with a short reason for the log) on a connection, TLS or HTTP error, a status other than 200,
-/// or a body that does not fit.
+/// a body that does not fit, or no answer within 30 s.
 pub async fn https_get(
+    stack: Stack<'static>,
+    url: &str,
+    user_agent: &str,
+    body: &mut [u8],
+) -> Result<usize, &'static str> {
+    match with_timeout(
+        REQUEST_TIMEOUT,
+        https_get_once(stack, url, user_agent, body),
+    )
+    .await
+    {
+        Ok(result) => result,
+        Err(_) => Err("request timed out"),
+    }
+}
+
+async fn https_get_once(
     stack: Stack<'static>,
     url: &str,
     user_agent: &str,

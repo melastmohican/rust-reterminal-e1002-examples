@@ -16,6 +16,7 @@ pub mod gfx;
 pub mod icons;
 pub mod net;
 
+#[allow(unused_imports)]
 pub use gfx::*;
 
 use core::cell::RefCell;
@@ -33,13 +34,11 @@ use epdsi::panels::GDEP073E01;
 use epdsi::traits::{ColorChannel, EpdPanel};
 use esp_hal::Async;
 use esp_hal::gpio::{Input, InputConfig, Level, Output, OutputConfig, Pull};
-use esp_hal::peripherals::{
-    GPIO7, GPIO8, GPIO9, GPIO10, GPIO11, GPIO12, GPIO13, LPWR, PSRAM, SPI2,
-};
-use esp_hal::rtc_cntl::{Rtc, sleep::TimerWakeupSource, wakeup_cause};
+use esp_hal::peripherals::{GPIO7, GPIO8, GPIO9, GPIO10, GPIO11, GPIO12, GPIO13, PSRAM, SPI2};
+use esp_hal::rtc_cntl::{SocResetReason, reset_reason};
 use esp_hal::spi::Mode as SpiMode;
 use esp_hal::spi::master::{Config as SpiConfig, Spi};
-use esp_hal::system::SleepSource;
+use esp_hal::system::Cpu;
 use static_cell::StaticCell;
 
 #[panic_handler]
@@ -55,17 +54,19 @@ pub async fn halt() -> ! {
     }
 }
 
-/// True when this boot is the wake-up of a [`deep_sleep`], not a power-on or a reset.
-pub fn woke_from_sleep() -> bool {
-    matches!(wakeup_cause(), SleepSource::Timer)
+/// True when this boot follows a [`wait_then_reset`], not a power-on or a flash. A refresh that fails then
+/// leaves the panel as it is, so the last good picture stays. Only the first run after power-on draws the error.
+pub fn after_loop_reset() -> bool {
+    reset_reason(Cpu::ProCpu) == Some(SocResetReason::CoreSw)
 }
 
-/// Deep-sleeps for `minutes`. The chip resets on wake-up, so `main` runs again from the start; nothing
-/// (Wi-Fi, heap, stack) survives. The panel keeps its picture without power.
-pub fn deep_sleep(lpwr: LPWR<'static>, minutes: u64) -> ! {
-    info!("deep sleep for {} min", minutes);
-    let timer = TimerWakeupSource::new(core::time::Duration::from_secs(minutes * 60));
-    Rtc::new(lpwr).sleep_deep(&[&timer])
+/// Waits `minutes` awake, then resets the chip in software, so `main` runs again from the start. Do not call
+/// `Rtc::sleep_deep` or `Rtc::sleep_light` here. With esp-hal 1.1, a sleep followed by Wi-Fi makes every later
+/// panel refresh draw noise until the power is removed (see `epd_ed2208_wake`). An awake wait does not.
+pub async fn wait_then_reset(minutes: u64) -> ! {
+    info!("next refresh in {} min", minutes);
+    embassy_time::Timer::after(embassy_time::Duration::from_secs(minutes * 60)).await;
+    esp_hal::system::software_reset()
 }
 
 /// Maps the 8 MB of PSRAM into the heap. Allocations that do not fit the internal regions land there.
@@ -217,6 +218,7 @@ impl Epd {
     /// controller to sleep. The panel keeps the picture without power.
     pub async fn show(&mut self, frame: &[u8]) {
         info!("[EPD] Writing frame...");
+        let t0 = embassy_time::Instant::now();
         if self
             .driver
             .write_frame(ColorChannel::Color7(0), frame)
@@ -226,12 +228,14 @@ impl Epd {
             error!("[EPD] Write frame failed");
             return;
         }
+        info!("[EPD] Written in {} ms", t0.elapsed().as_millis());
         info!("[EPD] Refreshing display (~25-30s)...");
+        let t1 = embassy_time::Instant::now();
         if self.driver.refresh(&mut Delay).await.is_err() {
             error!("[EPD] Refresh failed");
             return;
         }
-        info!("[EPD] Refresh complete.");
+        info!("[EPD] Refresh complete in {} ms.", t1.elapsed().as_millis());
         let _ = self.driver.sleep(&mut Delay).await;
     }
 }

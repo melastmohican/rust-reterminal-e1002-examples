@@ -5,8 +5,9 @@
 //! Joins Wi-Fi, reads the time over SNTP, fetches the top headlines from NewsAPI and draws the first three
 //! that have a description: a title over a red rule, the date and the time of the update, then for
 //! each article a blue headline (two lines at most) and a description (three lines at most). A failed
-//! request is retried 3 times. It then deep-sleeps and refreshes every 30 minutes (10 after a failure, keeping the last
-//! good picture), well inside NewsAPI's 100 requests a day. Deep sleep drops the USB serial log; reflash to see it.
+//! request is retried 3 times, and each request gives up after 30 s. It then waits awake with Wi-Fi off and resets
+//! itself every 30 minutes (10 after a failure, keeping the last good picture), well inside NewsAPI's 100
+//! requests a day. It does not use deep sleep: see `epd_ed2208_wake` for why.
 //!
 //! Needs a free key from <https://newsapi.org/>. The key and the Wi-Fi credentials are in `secret.rs`, and
 //! the request URL, which contains the key, is never logged:
@@ -258,7 +259,7 @@ async fn main(spawner: Spawner) -> ! {
     }
 
     // After a failed refresh the panel keeps the last good picture; only a first run shows the error.
-    if fetched || !common::woke_from_sleep() {
+    if fetched || !common::after_loop_reset() {
         let Some(mut epd) = common::Epd::new(
             p.SPI2, p.GPIO7, p.GPIO8, p.GPIO9, p.GPIO10, p.GPIO11, p.GPIO12, p.GPIO13,
         )
@@ -269,12 +270,10 @@ async fn main(spawner: Spawner) -> ! {
         };
         epd.show(&frame).await;
     }
-    common::deep_sleep(
-        p.LPWR,
-        if fetched {
-            REFRESH_MINUTES
-        } else {
-            RETRY_MINUTES
-        },
-    )
+    common::wait_then_reset(if fetched {
+        REFRESH_MINUTES
+    } else {
+        RETRY_MINUTES
+    })
+    .await
 }
