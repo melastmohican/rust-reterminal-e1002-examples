@@ -83,7 +83,7 @@ cargo run --release --example charger
 
 #### power_probe
 
-Bench example for the battery-boot fault: a boot on battery alone draws noise on the panel, while the same firmware on USB and the Arduino GxEPD2 sketch on battery are clean. With no serial log on battery, the user LED reports in a loop: the reset reason, the stage reached (Wi-Fi, panel init, refresh), the lowest battery voltage seen (a task samples it every 10 ms) and the refresh time. Measured so far: no brownout, 3.8 V to 3.9 V at the lowest, a normal 25 to 29 s refresh, and noise with or without Wi-Fi (`WIFI` constant). The cause is not found; see the header of the file.
+Bench example for the battery-boot fault: a cold start of the whole board (the back switch off, then on), most clearly on battery alone, can draw noise on the panel. With no serial log on battery, the user LED reports in a loop: the reset reason, the stage reached (Wi-Fi, panel init, refresh), the lowest battery voltage seen (a task samples it every 10 ms) and the refresh time. Measured so far: no brownout, 3.8 V to 3.9 V at the lowest, a normal 25 to 29 s refresh, and noise with or without Wi-Fi (`WIFI` constant). The cause is not found and the fault is intermittent; see the header of the file.
 
 ```bash
 cargo run --release --example power_probe
@@ -388,6 +388,8 @@ Included sample images in `./images/`:
 ### Wi-Fi & Generative Display Examples
 
 Ports of the GxEPD2 sketches for the reTerminal E1002, sharing `examples/common/` (panel, frame buffer in PSRAM, text, Wi-Fi/SNTP/HTTPS). `mandelbrot` and `quotables` run once and stop; reset to redraw. `news` and `weather_station` retry a failed request 3 times (each gives up after 30 s), then wait awake with Wi-Fi off and reset themselves every 30 minutes on USB and every 120 on battery, which they tell apart through the charger (10 after a failure, keeping the last good picture). They do not deep-sleep: see `epd_ed2208_wake` below. A full refresh takes about 30 s. The fonts are `u8g2` bitmap fonts of about the sketches' sizes, so the italic faces are upright.
+
+**Known limitation:** after a cold start of the whole board (the back switch off for 15 s or more, then on), the first draw can show brown and yellow noise instead of the picture, until the next refresh. It was seen on battery and on USB, with these examples and with the Arduino GxEPD2 sketch, so it is not specific to the Rust code. It is intermittent, and it is not caused by Wi-Fi, PSRAM, the SPI speed or the battery voltage. Run on USB power for now. `power_probe` is a bench example for it.
 
 Wi-Fi credentials (and the NewsAPI key) live in `secret.rs`, which is git-ignored. Copy the template and edit it:
 
