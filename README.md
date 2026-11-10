@@ -89,6 +89,14 @@ Bench example for the battery-boot fault: a cold start of the whole board (the b
 cargo run --release --example power_probe
 ```
 
+#### cold_start_bars
+
+Rust half of a cold-start test: it draws six colour bars and a footer (`<program> | build <id> | reset: <reason> | init: <ms> ms`), blinks the user LED three times after a power-on reset, and logs eight numbered steps in a fixed format (`[cold] program=... build=... step=N name t=MS`). It has an Arduino twin, `ColdStartBars` (GxEPD2), with the same steps, picture, LED and log, so that only the panel driver and the runtime differ. No Wi-Fi, no PSRAM, SPI at 2 MHz.
+
+```bash
+cargo run --release --example cold_start_bars
+```
+
 ### Button & Input Examples
 
 #### button

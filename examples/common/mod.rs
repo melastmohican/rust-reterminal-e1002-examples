@@ -188,9 +188,25 @@ pub struct Epd {
 }
 
 impl Epd {
-    /// Sets up SPI and the control pins and initialises the controller. Call once.
+    /// Sets up SPI at 10 MHz and the control pins and initialises the controller. Call once.
     #[allow(clippy::too_many_arguments)]
     pub async fn new(
+        spi2: SPI2<'static>,
+        sck: GPIO7<'static>,
+        miso: GPIO8<'static>,
+        mosi: GPIO9<'static>,
+        cs: GPIO10<'static>,
+        dc: GPIO11<'static>,
+        rst: GPIO12<'static>,
+        busy: GPIO13<'static>,
+    ) -> Option<Self> {
+        Self::new_at(10, spi2, sck, miso, mosi, cs, dc, rst, busy).await
+    }
+
+    /// As [`Epd::new`], with the SPI clock in MHz.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn new_at(
+        spi_mhz: u32,
         spi2: SPI2<'static>,
         sck: GPIO7<'static>,
         miso: GPIO8<'static>,
@@ -204,7 +220,7 @@ impl Epd {
         let spi = Spi::new(
             spi2,
             SpiConfig::default()
-                .with_frequency(esp_hal::time::Rate::from_mhz(10))
+                .with_frequency(esp_hal::time::Rate::from_mhz(spi_mhz))
                 .with_mode(SpiMode::_0),
         )
         .ok()?
@@ -232,9 +248,8 @@ impl Epd {
         Some(Self { driver })
     }
 
-    /// Writes the frame, runs the full refresh (about 25 to 30 s on this panel) and puts the
-    /// controller to sleep. The panel keeps the picture without power.
-    pub async fn show(&mut self, frame: &[u8]) {
+    /// Writes the frame to the controller. False if the write failed.
+    pub async fn write(&mut self, frame: &[u8]) -> bool {
         info!("[EPD] Writing frame...");
         let t0 = embassy_time::Instant::now();
         if self
@@ -244,16 +259,30 @@ impl Epd {
             .is_err()
         {
             error!("[EPD] Write frame failed");
-            return;
+            return false;
         }
         info!("[EPD] Written in {} ms", t0.elapsed().as_millis());
+        true
+    }
+
+    /// Runs the full refresh (about 25 to 30 s on this panel) and puts the controller to sleep. The panel keeps
+    /// the picture without power. False if the refresh failed.
+    pub async fn refresh(&mut self) -> bool {
         info!("[EPD] Refreshing display (~25-30s)...");
         let t1 = embassy_time::Instant::now();
         if self.driver.refresh(&mut Delay).await.is_err() {
             error!("[EPD] Refresh failed");
-            return;
+            return false;
         }
         info!("[EPD] Refresh complete in {} ms.", t1.elapsed().as_millis());
         let _ = self.driver.sleep(&mut Delay).await;
+        true
+    }
+
+    /// Writes the frame, runs the full refresh and puts the controller to sleep.
+    pub async fn show(&mut self, frame: &[u8]) {
+        if self.write(frame).await {
+            self.refresh().await;
+        }
     }
 }
