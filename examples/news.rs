@@ -6,7 +6,7 @@
 //! that have a description: a title over a red rule, the date and the time of the update, then for
 //! each article a blue headline (two lines at most) and a description (three lines at most). A failed
 //! request is retried 3 times, and each request gives up after 30 s. It then waits awake with Wi-Fi off and resets
-//! itself every 30 minutes (10 after a failure, keeping the last good picture), well inside NewsAPI's 100
+//! itself every 30 minutes on USB and every 120 on battery (10 after a failure, keeping the last good picture), well inside NewsAPI's 100
 //! requests a day. It does not use deep sleep: see `epd_ed2208_wake` for why.
 //!
 //! Needs a free key from <https://newsapi.org/>. The key and the Wi-Fi credentials are in `secret.rs`, and
@@ -45,6 +45,8 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 /// Minutes between refreshes, and after a failed one. 48 refreshes a day stay under NewsAPI's 100 requests.
 const REFRESH_MINUTES: u64 = 30;
+/// The same on battery alone, to spare the cell. The charger tells the two apart (see `common::on_usb`).
+const BATTERY_MINUTES: u64 = 120;
 const RETRY_MINUTES: u64 = 10;
 
 mod secret {
@@ -216,6 +218,10 @@ async fn main(spawner: Spawner) -> ! {
 
     info!("[E1002] News");
 
+    // No answer from the charger counts as USB, the shorter interval.
+    let on_usb = common::on_usb(p.I2C1, p.GPIO39, p.GPIO40).unwrap_or(true);
+    info!("power: {}", if on_usb { "USB" } else { "battery" });
+
     let mut frame = common::new_frame();
     let mut fetched = false;
 
@@ -270,10 +276,10 @@ async fn main(spawner: Spawner) -> ! {
         };
         epd.show(&frame).await;
     }
-    common::wait_then_reset(if fetched {
-        REFRESH_MINUTES
-    } else {
-        RETRY_MINUTES
-    })
-    .await
+    let minutes = match (fetched, on_usb) {
+        (false, _) => RETRY_MINUTES,
+        (true, true) => REFRESH_MINUTES,
+        (true, false) => BATTERY_MINUTES,
+    };
+    common::wait_then_reset(minutes).await
 }

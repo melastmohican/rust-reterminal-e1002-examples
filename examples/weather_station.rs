@@ -11,7 +11,7 @@
 //! - a strip of six days with an icon, the high (red arrow) and the low (blue arrow).
 //!
 //! A failed request is retried 3 times, and each request gives up after 30 s. It then waits awake with Wi-Fi off and
-//! resets itself every 30 minutes (10 after a failure, keeping the last good picture). It does not use deep
+//! resets itself every 30 minutes on USB and every 120 on battery (10 after a failure, keeping the last good picture). It does not use deep
 //! sleep: see `epd_ed2208_wake` for why. The first refresh comes about a minute after Wi-Fi connects.
 //!
 //! Set the city, coordinates and units in the constants below. Wi-Fi credentials are in `secret.rs`:
@@ -63,6 +63,8 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 /// Minutes between refreshes, and after a failed one. Open-Meteo updates its model every 15 minutes.
 const REFRESH_MINUTES: u64 = 30;
+/// The same on battery alone, to spare the cell. The charger tells the two apart (see `common::on_usb`).
+const BATTERY_MINUTES: u64 = 120;
 const RETRY_MINUTES: u64 = 10;
 
 mod secret {
@@ -609,6 +611,10 @@ async fn main(spawner: Spawner) -> ! {
 
     info!("[E1002] Weather station");
 
+    // No answer from the charger counts as USB, the shorter interval.
+    let on_usb = common::on_usb(p.I2C1, p.GPIO39, p.GPIO40).unwrap_or(true);
+    info!("power: {}", if on_usb { "USB" } else { "battery" });
+
     // Battery: the divider halves the voltage, so x2. Enable, sample, disable to save the cell.
     let mut batt_en = Output::new(p.GPIO21, Level::Low, OutputConfig::default());
     let mut adc_config = AdcConfig::new();
@@ -672,10 +678,10 @@ async fn main(spawner: Spawner) -> ! {
         };
         epd.show(&frame).await;
     }
-    common::wait_then_reset(if fetched {
-        REFRESH_MINUTES
-    } else {
-        RETRY_MINUTES
-    })
-    .await
+    let minutes = match (fetched, on_usb) {
+        (false, _) => RETRY_MINUTES,
+        (true, true) => REFRESH_MINUTES,
+        (true, false) => BATTERY_MINUTES,
+    };
+    common::wait_then_reset(minutes).await
 }

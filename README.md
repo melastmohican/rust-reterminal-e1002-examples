@@ -361,7 +361,7 @@ Included sample images in `./images/`:
 
 ### Wi-Fi & Generative Display Examples
 
-Ports of the GxEPD2 sketches for the reTerminal E1002, sharing `examples/common/` (panel, frame buffer in PSRAM, text, Wi-Fi/SNTP/HTTPS). `mandelbrot` and `quotables` run once and stop; reset to redraw. `news` and `weather_station` retry a failed request 3 times (each gives up after 30 s), then wait awake with Wi-Fi off and reset themselves every 30 minutes (10 after a failure, keeping the last good picture). They do not deep-sleep: see `epd_ed2208_wake` below. A full refresh takes about 30 s. The fonts are `u8g2` bitmap fonts of about the sketches' sizes, so the italic faces are upright.
+Ports of the GxEPD2 sketches for the reTerminal E1002, sharing `examples/common/` (panel, frame buffer in PSRAM, text, Wi-Fi/SNTP/HTTPS). `mandelbrot` and `quotables` run once and stop; reset to redraw. `news` and `weather_station` retry a failed request 3 times (each gives up after 30 s), then wait awake with Wi-Fi off and reset themselves every 30 minutes on USB and every 120 on battery, which they tell apart through the charger (10 after a failure, keeping the last good picture). They do not deep-sleep: see `epd_ed2208_wake` below. A full refresh takes about 30 s. The fonts are `u8g2` bitmap fonts of about the sketches' sizes, so the italic faces are upright.
 
 Wi-Fi credentials (and the NewsAPI key) live in `secret.rs`, which is git-ignored. Copy the template and edit it:
 
