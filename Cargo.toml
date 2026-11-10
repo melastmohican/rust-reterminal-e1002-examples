@@ -11,7 +11,8 @@ categories   = ["embedded", "no-std"]
 [dependencies]
 esp-hal = { version = "~1.1.0", features = ["defmt", "esp32s3", "unstable"] }
 
-esp-rtos = { version = "0.3.0", features = ["defmt", "embassy", "esp32s3"] }
+esp-rtos = { version = "0.3.0", features = ["defmt", "embassy", "esp32s3", "esp-radio", "esp-alloc"] }
+esp-alloc = { version = "0.10.0", features = ["defmt", "esp32s3"] }
 
 defmt                  = "1.0.1"
 esp-bootloader-esp-idf = { version = "0.5.0", features = ["defmt", "esp32s3"] }
@@ -31,6 +32,16 @@ epdsi            = { version = "0.10.0", default-features = false, features = ["
 nb               = "1.1.0"
 embedded-sdmmc   = "0.7.0"
 embedded-hal-bus = { version = "0.2.0", features = ["async"] }
+esp-radio = { version = "0.18.0", features = ["wifi", "esp32s3", "unstable", "defmt"] }
+embassy-net = { version = "0.9.1", features = ["defmt", "udp", "tcp", "dns", "dhcpv4", "medium-ethernet", "proto-ipv4"] }
+# Git, not crates.io: 0.14.0 pulls embedded-tls 0.18, which does not build with the current der
+# crates. Go back to crates.io when reqwless 0.14.1 is released.
+reqwless = { git = "https://github.com/drogue-iot/reqwless", rev = "094f5b850deb07f8a24086f546f7ac495d9f1ef2", features = ["defmt", "rsa"] }
+sntpc = { version = "0.11.0", default-features = false, features = ["defmt"] }
+sntpc-net-embassy = { version = "0.11.0", default-features = false, features = ["defmt"] }
+sntpc-time-embassy = "0.6.0"
+serde_json = { version = "1", default-features = false, features = ["alloc"] }
+u8g2-fonts = { version = "0.8.0", features = ["embedded_graphics_textstyle"] }
 
 # For fine tuning these settings, please refer to https://doc.rust-lang.org/cargo/reference/profiles.html
 [profile.dev]

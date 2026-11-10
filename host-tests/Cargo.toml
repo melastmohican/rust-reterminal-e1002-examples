@@ -1,0 +1,19 @@
+[package]
+name = "host-tests"
+version = "0.0.0"
+edition = "2024"
+publish = false
+description = "Host tests for the hardware-free code of the reTerminal E1002 examples"
+
+# Its own workspace: the examples crate's `.cargo/config.toml` forces the ESP target, which a host test
+# cannot use. `run.sh` starts cargo from a neutral directory for the same reason.
+[workspace]
+
+[dependencies]
+epdsi = { version = "0.10.0", default-features = false, features = ["graphics"] }
+embedded-graphics = "0.8.1"
+serde_json = { version = "1", default-features = false, features = ["alloc"] }
+u8g2-fonts = { version = "0.8.0", features = ["embedded_graphics_textstyle"] }
+
+[profile.dev]
+opt-level = 2

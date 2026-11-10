@@ -36,7 +36,26 @@ jobs:
           default: true
           buildtargets: esp32s3
           ldproxy: false
+      - name: Placeholder credentials
+        run: cp secret.rs.example secret.rs
       - name: Enable caching
         uses: Swatinem/rust-cache@v2
       - name: Run command
         run: cargo ${{ matrix.action.command }} ${{ matrix.action.args }}
+
+  host-tests:
+    name: Host tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Setup Rust
+        # Host toolchain, not the esp one: run.sh starts cargo from a neutral directory, so the
+        # crate's rust-toolchain.toml and .cargo/config.toml do not apply.
+        uses: dtolnay/rust-toolchain@stable
+      - name: Enable caching
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: host-tests
+      - name: Run host tests
+        run: ./host-tests/run.sh

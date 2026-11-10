@@ -24,3 +24,9 @@ target/
 
 # Ignore .DS_Store file in mac
 **/.DS_Store
+
+# Wi-Fi name and password and the NewsAPI key for the examples that connect (copy secret.rs.example)
+/secret.rs
+
+# Host test build output
+/host-tests/target/

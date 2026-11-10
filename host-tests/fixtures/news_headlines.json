@@ -1,0 +1,8 @@
+{"status":"ok","totalResults":6,"articles":[
+{"source":{"id":null,"name":"Sample Wire"},"author":null,"title":"City council approves new bike lanes","description":"The plan adds twelve miles of protected lanes over two years.","url":"https://example.invalid/1","urlToImage":null,"publishedAt":"2026-11-09T01:00:00Z","content":"Sample content [+100 chars]"},
+{"source":{"id":null,"name":"Sample Wire"},"author":"A. Writer","title":"Storm “warning” issued for the coast – again","description":"Forecasters expect strong wind overnight… and heavy rain.","url":"https://example.invalid/2","urlToImage":null,"publishedAt":"2026-11-09T01:05:00Z","content":null},
+{"source":{"id":null,"name":"Sample Wire"},"author":null,"title":"Headline without a description","description":null,"url":"https://example.invalid/3","urlToImage":null,"publishedAt":"2026-11-09T01:10:00Z","content":null},
+{"source":{"id":null,"name":"Sample Wire"},"author":null,"title":"Headline with an empty description","description":"","url":"https://example.invalid/4","urlToImage":null,"publishedAt":"2026-11-09T01:12:00Z","content":null},
+{"source":{"id":null,"name":"Sample Wire"},"author":null,"title":"Café opens a third location downtown","description":"The owner says the new shop will serve a short menu.","url":"https://example.invalid/5","urlToImage":null,"publishedAt":"2026-11-09T01:15:00Z","content":null},
+{"source":{"id":null,"name":"Sample Wire"},"author":null,"title":"Local team wins the final","description":"A late goal decided the match in front of a full stadium.","url":"https://example.invalid/6","urlToImage":null,"publishedAt":"2026-11-09T01:20:00Z","content":null}
+]}

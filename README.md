@@ -333,6 +333,53 @@ Included sample images in `./images/`:
 
 ---
 
+### Wi-Fi & Generative Display Examples
+
+Ports of the GxEPD2 sketches for the reTerminal E1002, sharing `examples/common/` (panel, frame buffer in PSRAM, text, Wi-Fi/SNTP/HTTPS). `mandelbrot` and `quotables` run once and stop; reset to redraw. `news` and `weather_station` retry a failed request 3 times, then deep-sleep and refresh every 30 minutes (10 after a failure, keeping the last good picture); deep sleep drops the USB serial log. A full refresh takes about 30 s. The fonts are `u8g2` bitmap fonts of about the sketches' sizes, so the italic faces are upright.
+
+Wi-Fi credentials (and the NewsAPI key) live in `secret.rs`, which is git-ignored. Copy the template and edit it:
+
+```bash
+cp secret.rs.example secret.rs
+cargo run --release --example quotables
+```
+
+The examples will not build without `secret.rs`; CI copies the placeholder. The hardware-free code (parsing, mappings, drawing) is tested on the host with `./host-tests/run.sh`.
+
+#### mandelbrot
+
+The whole Mandelbrot set, computed in `f32` straight into the frame buffer: black inside, white/yellow/red/green/blue bands by escape time. No Wi-Fi. Edit `CENTER_X`, `CENTER_Y` and `RANGE_X` to zoom.
+
+```bash
+cargo run --release --example mandelbrot
+```
+
+#### quotables
+
+A random quote from `api.quotable.kurokeita.dev`: red opening quote mark, the quote in black, the author in blue. Quotes over 128 bytes are skipped, up to 10 tries.
+
+```bash
+cargo run --release --example quotables
+```
+
+#### news
+
+Top headlines from NewsAPI (free key from <https://newsapi.org/>), three articles with a blue headline and a description, plus the date and update time from SNTP (`TIME_ZONE`, default UTC-8).
+
+```bash
+cargo run --release --example news
+```
+
+#### weather_station
+
+Open-Meteo dashboard (no key): current weather, battery level (GPIO1/GPIO21), a six-hour temperature and rain-chance graph, and a six-day strip. Set `CITY`, `LATITUDE`, `LONGITUDE`, `USERNAME` and `METRIC_UNITS` in the file. Icons are Lucide (ISC, `assets/LICENSE-lucide.txt`).
+
+```bash
+cargo run --release --example weather_station
+```
+
+---
+
 ## License
 
 Dual-licensed under either of:
