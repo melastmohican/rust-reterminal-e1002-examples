@@ -7,7 +7,7 @@
 //! each article a blue headline (two lines at most) and a description (three lines at most). A failed
 //! request is retried 3 times, and each request gives up after 30 s. It then waits awake with Wi-Fi off and resets
 //! itself every 30 minutes on USB and every 120 on battery (10 after a failure, keeping the last good picture), well inside NewsAPI's 100
-//! requests a day. It does not use deep sleep: see `epd_ed2208_wake` for why.
+//! requests a day. It does not use deep sleep: see the `epd_ed2208_wake` bench on the `troubleshooting` branch for why.
 //!
 //! Needs a free key from <https://newsapi.org/>. The key and the Wi-Fi credentials are in `secret.rs`, and
 //! the request URL, which contains the key, is never logged:

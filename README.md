@@ -81,14 +81,6 @@ Probes the SY6974B Li-Po charger on its own I2C bus (`GPIO39` SDA, `GPIO40` SCL)
 cargo run --release --example charger
 ```
 
-#### power_probe
-
-Bench example for the battery-boot fault: a cold start of the whole board (the back switch off, then on), most clearly on battery alone, can draw noise on the panel. With no serial log on battery, the user LED reports in a loop: the reset reason, the stage reached (Wi-Fi, panel init, refresh), the lowest battery voltage seen (a task samples it every 10 ms) and the refresh time. Measured so far: no brownout, 3.8 V to 3.9 V at the lowest, a normal 25 to 29 s refresh, and noise with or without Wi-Fi (`WIFI` constant). The cause is not found and the fault is intermittent; see the header of the file.
-
-```bash
-cargo run --release --example power_probe
-```
-
 ### Button & Input Examples
 
 #### button
@@ -264,56 +256,6 @@ Fills the panel yellow, then writes three 24-row bands of black and white vertic
 cargo run --release --example epd_ed2208_partial_alignment
 ```
 
-#### epd_ed2208_fast_init
-
-Bench A/B for Good Display's `EPD_init_fast` on the 7.3" GDEP073E01 panel. It is a throwaway test for `epdsi`'s backlog item `ed2208-vendor-fast-init`, not a recommended init.
-
-Draws the same six-bar swatch (black, white, yellow, red, blue, green) three times: after `epdsi`'s plain init, after the vendor fast init sent as raw commands, and after the plain init again as the control. It logs the init and refresh time for each and holds 30 s so you can photograph the panel. Compare the refresh times and how saturated the bars look. The vendor sequence differs from the plain one in nine writes (PWRR, BTST2 and PLL changed, and IPC, TSE, VDCS, AGID, CCSET and TSSET added).
-
-Power-cycle the board first and do not interrupt the run.
-
-```bash
-cargo run --release --example epd_ed2208_fast_init
-```
-
-#### epd_ed2208_pll
-
-Bench A/B for the refresh-speed register (PLL, `0x30`) on the 7.3" GDEP073E01 panel. Pimoroni's Inky Impression 7.3" driver sends the same ED2208 commands as `epdsi` but lets you pick PLL `0x08` (normal), `0x04` (75 Hz) or `0x07` (120 Hz), and warns that faster speeds wash out blue and green. `epdsi` always sends `0x08`.
-
-Draws the same six-bar swatch four times: PLL `0x08`, `0x04`, `0x07`, then `0x08` again as the control. It logs the init and refresh time for each and holds 30 s so you can photograph the panel. PLL is written after `driver.init`, so after `PON`; if the times do not move, the value may have been ignored there.
-
-Result on the reTerminal E1002 (9 Nov 2026): `0x08` 28.4 s, `0x04` 21.9 s, `0x07` 14.3 s, control `0x08` 28.4 s. The register works after `PON`. In photos blue and green get duller as the speed goes up, black, white and yellow do not change.
-
-Power-cycle the board first and do not interrupt the run.
-
-```bash
-cargo run --release --example epd_ed2208_pll
-```
-
-#### epd_ed2208_wake
-
-Bench example for a fault found on 9 Nov 2026: after an `esp-hal` deep or light sleep, a Wi-Fi join and fetch before the panel init makes every later refresh draw brown or yellow noise. A software reset does not clear it; only removing the power does. This is why `weather_station` and `news` wait awake and reset instead of sleeping.
-
-Draws six colour bars, sleeps 60 s, wakes and draws them in reverse order. Four switches (`PSRAM_FRAME`, `WIFI`, `RESET_AFTER_WAKE`, `LIGHT_SLEEP`) bisect the cause; the header lists every variant tried and its result. The defaults reproduce the fault (needs `secret.rs`). The cause is not found.
-
-Power-cycle the board first and do not interrupt the run. After a noisy run, power-cycle again.
-
-```bash
-cargo run --release --example epd_ed2208_wake
-```
-
-#### epd_ed2208_power_cycle
-
-Bench A/B for the per-refresh power cycle on the 7.3" GDEP073E01 panel. It is a throwaway test for `epdsi`'s backlog item `ed2208-per-refresh-power-cycle`, not a recommended flow.
-
-`epdsi` powers the rails on once in init and sends only `DRF` per refresh. Good Display's solid-colour demo screens, M5GFX and Inkplate send `PON`, a BTST2 rewrite, `DRF` and `POF` on every refresh instead. This example runs five chained updates under three flows: power-on-once (current `epdsi`), power-cycle per refresh, and power-cycle with Inkplate's init value for BTST2 (`17 17`, rewritten to `49` after `PON`). Each update redraws six bars with the colours rotated one place, so nothing repeats between updates.
-
-It logs every refresh time and holds 25 s after update 1 and update 5 of each flow so you can photograph the panel. Compare blue and white for fade. The run takes about 10 minutes. Power-cycle the board first and do not interrupt it.
-
-```bash
-cargo run --release --example epd_ed2208_power_cycle
-```
-
 #### epd_ed2208_bmp
 
 Displays 24-bit or 32-bit uncompressed BMP images from a microSD card on the 7.3" Good Display GDEP073E01 6-Color ACeP panel using the local `epdsi` driver library (`Ed2208Controller`).
@@ -387,9 +329,9 @@ Included sample images in `./images/`:
 
 ### Wi-Fi & Generative Display Examples
 
-Ports of the GxEPD2 sketches for the reTerminal E1002, sharing `examples/common/` (panel, frame buffer in PSRAM, text, Wi-Fi/SNTP/HTTPS). `mandelbrot` and `quotables` run once and stop; reset to redraw. `news` and `weather_station` retry a failed request 3 times (each gives up after 30 s), then wait awake with Wi-Fi off and reset themselves every 30 minutes on USB and every 120 on battery, which they tell apart through the charger (10 after a failure, keeping the last good picture). They do not deep-sleep: see `epd_ed2208_wake` below. A full refresh takes about 30 s. The fonts are `u8g2` bitmap fonts of about the sketches' sizes, so the italic faces are upright.
+Ports of the GxEPD2 sketches for the reTerminal E1002, sharing `examples/common/` (panel, frame buffer in PSRAM, text, Wi-Fi/SNTP/HTTPS). `mandelbrot` and `quotables` run once and stop; reset to redraw. `news` and `weather_station` retry a failed request 3 times (each gives up after 30 s), then wait awake with Wi-Fi off and reset themselves every 30 minutes on USB and every 120 on battery, which they tell apart through the charger (10 after a failure, keeping the last good picture). They do not deep-sleep: see the `epd_ed2208_wake` bench on the `troubleshooting` branch (see "Troubleshooting examples" below). A full refresh takes about 30 s. The fonts are `u8g2` bitmap fonts of about the sketches' sizes, so the italic faces are upright.
 
-**Known limitation:** after a cold start of the whole board (the back switch off for 15 s or more, then on), the first draw can show brown and yellow noise instead of the picture, until the next refresh. It was seen on battery and on USB, with these examples and with the Arduino GxEPD2 sketch, so it is not specific to the Rust code. It is intermittent, and it is not caused by Wi-Fi, PSRAM, the SPI speed or the battery voltage. Run on USB power for now. `power_probe` is a bench example for it.
+**Known limitation:** after a cold start of the whole board (the back switch off for 15 s or more, then on), the first draw can show brown and yellow noise instead of the picture, until the next refresh. It was seen on battery and on USB, with these examples and with the Arduino GxEPD2 sketch, so it is not specific to the Rust code. It is intermittent, and it is not caused by Wi-Fi, PSRAM, the SPI speed or the battery voltage. Run on USB power for now. The bench examples for it, `power_probe` and `cold_start_bars`, are on the `troubleshooting` branch.
 
 Wi-Fi credentials (and the NewsAPI key) live in `secret.rs`, which is git-ignored. Copy the template and edit it:
 
@@ -433,6 +375,24 @@ cargo run --release --example weather_station
 ```
 
 ---
+
+## Troubleshooting examples
+
+Bench and A/B examples written to chase specific faults are kept on the [`troubleshooting`](https://github.com/melastmohican/rust-reterminal-e1002-examples/tree/troubleshooting) branch, so they do not clutter `main`:
+
+| Example | What it was for |
+| --- | --- |
+| `epd_ed2208_wake` | the sleep-then-Wi-Fi panel noise (esp-hal deep or light sleep, then Wi-Fi) |
+| `power_probe` | the cold-start and battery-boot noise: reset reason, stage, battery voltage and refresh time on the LED |
+| `cold_start_bars` | a cold-start test with an Arduino twin (GxEPD2) |
+| `epd_ed2208_pll` | refresh speed against the PLL setting |
+| `epd_ed2208_fast_init` | the vendor `EPD_init_fast` against the normal init |
+| `epd_ed2208_power_cycle` | a per-refresh power cycle against power-on once |
+
+```bash
+git checkout troubleshooting
+cargo run --release --example epd_ed2208_wake
+```
 
 ## License
 

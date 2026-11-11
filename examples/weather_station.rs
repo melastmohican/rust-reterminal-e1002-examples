@@ -12,7 +12,7 @@
 //!
 //! A failed request is retried 3 times, and each request gives up after 30 s. It then waits awake with Wi-Fi off and
 //! resets itself every 30 minutes on USB and every 120 on battery (10 after a failure, keeping the last good picture). It does not use deep
-//! sleep: see `epd_ed2208_wake` for why. The first refresh comes about a minute after Wi-Fi connects.
+//! sleep: see the `epd_ed2208_wake` bench on the `troubleshooting` branch for why. The first refresh comes about a minute after Wi-Fi connects.
 //!
 //! Set the city, coordinates and units in the constants below. Wi-Fi credentials are in `secret.rs`:
 //!

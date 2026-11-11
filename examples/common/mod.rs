@@ -80,7 +80,7 @@ pub fn on_usb(i2c1: I2C1<'static>, sda: GPIO39<'static>, scl: GPIO40<'static>) -
 
 /// Waits `minutes` awake, then resets the chip in software, so `main` runs again from the start. Do not call
 /// `Rtc::sleep_deep` or `Rtc::sleep_light` here. With esp-hal 1.1, a sleep followed by Wi-Fi makes every later
-/// panel refresh draw noise until the power is removed (see `epd_ed2208_wake`). An awake wait does not.
+/// panel refresh draw noise until the power is removed (see the `epd_ed2208_wake` bench on the `troubleshooting` branch). An awake wait does not.
 pub async fn wait_then_reset(minutes: u64) -> ! {
     info!("next refresh in {} min", minutes);
     embassy_time::Timer::after(embassy_time::Duration::from_secs(minutes * 60)).await;
