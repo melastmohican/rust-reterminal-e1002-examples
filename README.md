@@ -256,6 +256,20 @@ Fills the panel yellow, then writes three 24-row bands of black and white vertic
 cargo run --release --example epd_ed2208_partial_alignment
 ```
 
+#### epd_ed2208_refresh_speed
+
+Shows `Ed2208Controller::with_refresh_speed` on the 7.3" GDEP073E01 panel. The setting picks the PLL control register value that `init` writes, trading colour for refresh time. It needs an `epdsi` release that has `Ed2208RefreshSpeed` (after 0.10.2).
+
+Draws a six-bar swatch (black, white, yellow, red, blue, green) at `Normal`, `Medium` and `Fast`, then at `Normal` again as a control, and logs the refresh time of each stage. Each result holds for 10 seconds. The whole run takes about two minutes.
+
+**Bench result (10 Nov 2026):** `Normal` 28.4 s, `Medium` 21.9 s, `Fast` 14.3 s, control 28.4 s. Blue and green wash out as the speed goes up, clearly so at `Fast`.
+
+Power-cycle the board before each run. The example puts the panel to sleep when it finishes, and a reset or reflash does not wake it: the refreshes then return in about 1 ms and draw nothing.
+
+```bash
+cargo run --release --example epd_ed2208_refresh_speed
+```
+
 #### epd_ed2208_bmp
 
 Displays 24-bit or 32-bit uncompressed BMP images from a microSD card on the 7.3" Good Display GDEP073E01 6-Color ACeP panel using the local `epdsi` driver library (`Ed2208Controller`).
