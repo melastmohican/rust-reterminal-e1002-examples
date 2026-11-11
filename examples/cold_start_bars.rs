@@ -9,8 +9,8 @@
 //! 7 draw done (frame written, refreshed, panel asleep), 8 idle.
 //!
 //! - **Picture:** six bars (black, white, yellow, red, blue, green) over 432 rows, then a white footer strip with
-//!   `<program> <build> | reset <reason> | init <ms> | run <id>`. The run id is 4 hex digits from a floating ADC
-//!   pin (GPIO2), different on every boot.
+//!   `<program> <build> | reset <reason> | init <ms> | run <id>`. The run id is 4 hex digits from the hardware
+//!   RNG, different on every boot (the Arduino twin reads the same register with `esp_random()`).
 //! - **LED** (GPIO6, active low): three blinks after a power-on reset.
 //! - **Log** (USB only): `[cold] program=... build=... step=N name t=MS`, `[cold] reset_reason=...` before step 1 and
 //!   `[cold] run_id=XXXX` at step 3.
@@ -36,9 +36,9 @@ use embedded_graphics::{
     prelude::*,
     primitives::{PrimitiveStyle, Rectangle},
 };
-use esp_hal::analog::adc::{Adc, AdcConfig, Attenuation};
 use esp_hal::clock::CpuClock;
 use esp_hal::gpio::{Level, Output, OutputConfig};
+use esp_hal::rng::Rng;
 use esp_hal::rtc_cntl::{SocResetReason, reset_reason};
 use esp_hal::system::Cpu;
 use esp_println::println;
@@ -47,7 +47,7 @@ use u8g2_fonts::types::HorizontalAlignment;
 esp_bootloader_esp_idf::esp_app_desc!();
 
 const PROGRAM: &str = "Rust cold_start_bars";
-const BUILD: &str = "b2";
+const BUILD: &str = "b3";
 const BAR_ROWS: u32 = 432;
 
 /// One log line, in the format shared with the Arduino twin.
@@ -97,16 +97,10 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
     Timer::after(Duration::from_secs(2)).await;
     step(3, "wait 2 s");
 
-    // A floating pin gives a different reading on every boot.
-    let mut adc_config = AdcConfig::new();
-    let mut run_pin = adc_config.enable_pin(p.GPIO2, Attenuation::_11dB);
-    let mut adc = Adc::new(p.ADC1, adc_config);
-    let mut run_id: u16 = 0;
-    for _ in 0..8 {
-        let v: u16 = nb::block!(adc.read_oneshot(&mut run_pin)).unwrap_or(0);
-        run_id = run_id.wrapping_mul(31).wrapping_add(v);
-        Timer::after(Duration::from_millis(1)).await;
-    }
+    // Two reads of the hardware RNG, folded to 16 bits. The Arduino twin does the same with esp_random().
+    let rng = Rng::new();
+    let (r1, r2) = (rng.random(), rng.random());
+    let run_id = ((r1 ^ (r2 >> 16)) & 0xFFFF) as u16;
     println!("[cold] run_id={:04x}", run_id);
 
     step(4, "panel init start");
