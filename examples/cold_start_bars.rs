@@ -9,9 +9,11 @@
 //! 7 draw done (frame written, refreshed, panel asleep), 8 idle.
 //!
 //! - **Picture:** six bars (black, white, yellow, red, blue, green) over 432 rows, then a white footer strip with
-//!   `<program> | build <id> | reset: <reason> | init: <ms> ms`.
+//!   `<program> <build> | reset <reason> | init <ms> | run <id>`. The run id is 4 hex digits from a floating ADC
+//!   pin (GPIO2), different on every boot.
 //! - **LED** (GPIO6, active low): three blinks after a power-on reset.
-//! - **Log** (USB only): `[cold] program=... build=... step=N name t=MS`, and `[cold] reset_reason=...` before step 1.
+//! - **Log** (USB only): `[cold] program=... build=... step=N name t=MS`, `[cold] reset_reason=...` before step 1 and
+//!   `[cold] run_id=XXXX` at step 3.
 //! - No Wi-Fi, no PSRAM, SPI at 2 MHz, 240 MHz CPU.
 //!
 //! ## Run
@@ -34,6 +36,7 @@ use embedded_graphics::{
     prelude::*,
     primitives::{PrimitiveStyle, Rectangle},
 };
+use esp_hal::analog::adc::{Adc, AdcConfig, Attenuation};
 use esp_hal::clock::CpuClock;
 use esp_hal::gpio::{Level, Output, OutputConfig};
 use esp_hal::rtc_cntl::{SocResetReason, reset_reason};
@@ -44,7 +47,7 @@ use u8g2_fonts::types::HorizontalAlignment;
 esp_bootloader_esp_idf::esp_app_desc!();
 
 const PROGRAM: &str = "Rust cold_start_bars";
-const BUILD: &str = "b1";
+const BUILD: &str = "b2";
 const BAR_ROWS: u32 = 432;
 
 /// One log line, in the format shared with the Arduino twin.
@@ -94,6 +97,18 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
     Timer::after(Duration::from_secs(2)).await;
     step(3, "wait 2 s");
 
+    // A floating pin gives a different reading on every boot.
+    let mut adc_config = AdcConfig::new();
+    let mut run_pin = adc_config.enable_pin(p.GPIO2, Attenuation::_11dB);
+    let mut adc = Adc::new(p.ADC1, adc_config);
+    let mut run_id: u16 = 0;
+    for _ in 0..8 {
+        let v: u16 = nb::block!(adc.read_oneshot(&mut run_pin)).unwrap_or(0);
+        run_id = run_id.wrapping_mul(31).wrapping_add(v);
+        Timer::after(Duration::from_millis(1)).await;
+    }
+    println!("[cold] run_id={:04x}", run_id);
+
     step(4, "panel init start");
     let Some(mut epd) = common::Epd::new_at(
         2, p.SPI2, p.GPIO7, p.GPIO8, p.GPIO9, p.GPIO10, p.GPIO11, p.GPIO12, p.GPIO13,
@@ -107,8 +122,8 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
     step(5, "panel init done");
 
     let footer = format!(
-        "{} | build {} | reset: {} | init: {} ms",
-        PROGRAM, BUILD, reason, init_ms
+        "{} {} | reset {} | init {} | run {:04x}",
+        PROGRAM, BUILD, reason, init_ms, run_id
     );
     let mut frame = common::new_frame();
     {
